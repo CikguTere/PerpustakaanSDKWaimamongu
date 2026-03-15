@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PerpusSmart Cloud (Real-time)</title>
+    <title>PerpusSmart Premium</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js -->
@@ -56,7 +56,7 @@
                 memberTab: 'dashboard', 
 
                 // SETTINGS
-                siteSettings: {
+                siteSettings: JSON.parse(localStorage.getItem('perpusSettings')) || {
                     libraryName: 'Perpustakaan SD Katholik Waimamongu',
                     welcomeMessage: 'Jelajahi Dunia Pengetahuan Melalui Koleksi Digital Kami.',
                     waNumber: '6281234567890'
@@ -115,14 +115,14 @@
                 dbUser: null,
                 seeded: false,
 
-                // Data Array Real-time
+                // Data Array
                 books: [],
                 collections: [],
                 members: [],
                 loans: [],
                 journals: [],
 
-                // Mock Data (hanya digunakan sekali jika DB kosong untuk visual awal)
+                // Data Dummy Awal
                 mockBooks: [
                     { id: "1", code: 'B001', title: 'Laskar Pelangi', author: 'Andrea Hirata', category: 'Novel', stock: 5, cover: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400', link: 'https://mozilla.github.io/pdf.js/web/viewer.html?file=https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf' },
                     { id: "2", code: 'B002', title: 'Bumi Manusia', author: 'Pramoedya Ananta Toer', category: 'Fiksi', stock: 3, cover: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=400', link: 'https://mozilla.github.io/pdf.js/web/viewer.html?file=https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf' }
@@ -137,37 +137,53 @@
                     this.$watch('memberTab', () => { this.searchQuery = ''; this.$nextTick(() => lucide.createIcons()); });
                     this.$nextTick(() => { lucide.createIcons(); });
 
-                    // Memulai koneksi ke Firebase Database
+                    // Default to Local Mode first
+                    this.books = [...this.mockBooks];
+                    this.collections = [...this.mockCollections];
+
+                    // Coba Konek ke Firebase
                     let checks = 0;
                     while(!window.fb && checks < 50) { await new Promise(r => setTimeout(r, 100)); checks++; }
 
                     if(window.fb) {
                         try {
-                            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-                            this.appId = typeof __app_id !== 'undefined' ? __app_id : 'perpus-app-db';
+                            // ======================================================================
+                            // ⚠️ PENTING: GANTI NILAI DI BAWAH INI DENGAN FIREBASE CONFIG ASLI ANDA
+                            // ======================================================================
+                            const firebaseConfig = {
+                                apiKey: "AIzaSyASgFqPwhJEcxDpiQqZ3Sg1WqUHp3yHZ4I",
+                                authDomain: "perpustakaan-digital-sd.firebaseapp.com",
+                                projectId: "perpustakaan-digital-sd",
+                                storageBucket: "perpustakaan-digital-sd.firebasestorage.app",
+                                messagingSenderId: "713790924945",
+                                appId: "1:713790924945:web:8c1171ad7764f944153730"
+                            };
 
-                            if (!firebaseConfig) { console.warn("Menjalankan mode lokal (Tanpa Cloud)."); return; }
+                            // Jika API Key belum diubah, otomatis fallback ke Mode Lokal
+                            if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("PASTE_API_KEY")) { 
+                                console.warn("API Key belum diisi. Menjalankan Mode Lokal (Tanpa Cloud)."); 
+                                return; 
+                            }
+
+                            this.appId = firebaseConfig.projectId;
 
                             const app = window.fb.initializeApp(firebaseConfig);
                             this.auth = window.fb.getAuth(app);
                             this.db = window.fb.getFirestore(app);
 
-                            // Firebase Rule 3: Autentikasi sebelum kueri
-                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                                await window.fb.signInWithCustomToken(this.auth, __initial_auth_token);
-                            } else {
-                                await window.fb.signInAnonymously(this.auth);
-                            }
+                            // Menggunakan Autentikasi Anonim (Harus diaktifkan di Firebase Console)
+                            await window.fb.signInAnonymously(this.auth);
 
                             window.fb.onAuthStateChanged(this.auth, (user) => {
                                 this.dbUser = user;
                                 if (user) this.setupRealtimeListeners();
                             });
-                        } catch (e) { console.error("Error Koneksi Database:", e); }
+                        } catch (e) { 
+                            console.error("Error Koneksi Database (Melanjutkan di Mode Lokal):", e); 
+                        }
                     }
                 },
 
-                // Helpers Firebase Rule 1: Struktur Path Data ketat
                 getCol(name) { return window.fb.collection(this.db, 'artifacts', this.appId, 'public', 'data', name); },
                 getDoc(name, id) { return window.fb.doc(this.db, 'artifacts', this.appId, 'public', 'data', name, id.toString()); },
 
@@ -175,11 +191,9 @@
                     if (!this.dbUser) return;
                     this.isCloudConnected = true;
 
-                    // Fungsi pembantu untuk sinkronisasi Collection otomatis
                     const syncCollection = (colName, arrayName) => {
                         window.fb.onSnapshot(this.getCol(colName), (snapshot) => {
                             if(!snapshot.empty) {
-                                // Urutkan data terbaru di atas
                                 let data = snapshot.docs.map(doc => doc.data());
                                 data.sort((a,b) => b.id - a.id);
                                 this[arrayName] = data;
@@ -190,7 +204,6 @@
                         }, (e) => console.error("Sync Error:", e));
                     };
 
-                    // Cek & Seed Data Awal ke DB (Jika kosong)
                     window.fb.getDoc(this.getDoc('settings', 'global')).then(docSnap => {
                         if (!docSnap.exists()) {
                             this.seeded = false;
@@ -203,19 +216,16 @@
                             this.seeded = true;
                         }
 
-                        // Mengaktifkan Listeners Real-time
                         syncCollection('books', 'books');
                         syncCollection('members', 'members');
                         syncCollection('collections', 'collections');
                         syncCollection('loans', 'loans');
                         syncCollection('journals', 'journals');
 
-                        // Sync Settings
                         window.fb.onSnapshot(this.getDoc('settings', 'global'), (doc) => {
                             if(doc.exists()) this.siteSettings = doc.data();
                         }, e => console.error(e));
 
-                        // Sync Visitor Stats
                         window.fb.onSnapshot(this.getDoc('stats', 'visitor'), (doc) => {
                             if(doc.exists()) {
                                 this.visitorCount = doc.data().visitorCount || 0;
@@ -238,7 +248,6 @@
                     return 'M' + (lastIdNum + 1);
                 },
 
-                // Fitur Kompresi Gambar agar hemat memori cloud (maks 400px width)
                 handleFileUpload(event, targetObject, propertyName) {
                     const file = event.target.files[0];
                     if (file) {
@@ -254,7 +263,7 @@
                                 canvas.width = width; canvas.height = height;
                                 const ctx = canvas.getContext('2d');
                                 ctx.drawImage(img, 0, 0, width, height);
-                                targetObject[propertyName] = canvas.toDataURL('image/jpeg', 0.7); // Kompresi JPEG 70%
+                                targetObject[propertyName] = canvas.toDataURL('image/jpeg', 0.7); 
                             };
                             img.src = e.target.result;
                         };
@@ -262,21 +271,29 @@
                     }
                 },
 
-                // DATABASE WRITES -------------------------------------
+                // ==== ACTIONS DENGAN FALLBACK LOKAL ====
                 saveSettings() {
-                    window.fb.setDoc(this.getDoc('settings', 'global'), this.siteSettings);
-                    this.showToast('Pengaturan berhasil disimpan di Cloud!');
+                    localStorage.setItem('perpusSettings', JSON.stringify(this.siteSettings));
+                    if (this.isCloudConnected) {
+                        window.fb.setDoc(this.getDoc('settings', 'global'), this.siteSettings);
+                    }
+                    this.showToast('Pengaturan berhasil disimpan!');
                 },
 
                 submitGuestbook() {
                     if(!this.guestbookEntry.name || !this.guestbookEntry.institution || !this.guestbookEntry.district || !this.guestbookEntry.province) {
                         return this.showToast('Mohon lengkapi semua data buku tamu.', 'error');
                     }
-                    // Update stats ke cloud
-                    window.fb.updateDoc(this.getDoc('stats', 'visitor'), { 
-                        visitorCount: this.visitorCount + 1, 
-                        todayVisitorCount: this.todayVisitorCount + 1 
-                    });
+                    
+                    this.visitorCount++;
+                    this.todayVisitorCount++;
+                    
+                    if (this.isCloudConnected) {
+                        window.fb.updateDoc(this.getDoc('stats', 'visitor'), { 
+                            visitorCount: this.visitorCount, 
+                            todayVisitorCount: this.todayVisitorCount 
+                        });
+                    }
                     
                     this.hasFilledGuestbook = true;
                     this.showGuestbookModal = false;
@@ -292,13 +309,15 @@
                     
                     const newMemberObj = { ...this.newMember, id, memberId: newId, photo };
                     
-                    // Simpan ke Cloud
-                    window.fb.setDoc(this.getDoc('members', id), newMemberObj);
+                    if (this.isCloudConnected) {
+                        window.fb.setDoc(this.getDoc('members', id), newMemberObj);
+                    } else {
+                        this.members.unshift(newMemberObj);
+                    }
                     
                     this.showToast(`Pendaftaran Berhasil! ID Anda: ${newId}`);
                     this.resetMemberForm();
                     
-                    // Auto Login
                     this.currentUser = { ...newMemberObj, role: 'member' };
                     this.memberTab = 'dashboard';
                     this.appState = 'member';
@@ -308,67 +327,128 @@
                 addBook() {
                     const id = Date.now().toString();
                     const cover = this.newBook.cover || 'https://images.unsplash.com/photo-1543004218-ee141104308d?w=400';
-                    window.fb.setDoc(this.getDoc('books', id), { ...this.newBook, id, cover });
+                    const newBookObj = { ...this.newBook, id, cover };
+
+                    if (this.isCloudConnected) {
+                        window.fb.setDoc(this.getDoc('books', id), newBookObj);
+                    } else {
+                        this.books.unshift(newBookObj);
+                    }
+
                     this.showAddBookModal = false;
                     this.resetBookForm();
-                    this.showToast('Buku berhasil ditambahkan ke Cloud!');
+                    this.showToast('Buku berhasil ditambahkan!');
+                    this.$nextTick(() => lucide.createIcons());
                 },
+                
                 updateBook() {
-                    window.fb.updateDoc(this.getDoc('books', this.editingBook.id.toString()), this.editingBook);
+                    if (this.isCloudConnected) {
+                        window.fb.updateDoc(this.getDoc('books', this.editingBook.id.toString()), this.editingBook);
+                    } else {
+                        const index = this.books.findIndex(b => b.id.toString() === this.editingBook.id.toString());
+                        if (index !== -1) this.books[index] = { ...this.editingBook };
+                    }
                     this.showEditBookModal = false; 
                     this.showToast('Data buku diperbarui!');
                 },
+
                 deleteBook(id) { 
                     if(this.staffRole !== 'Admin') return this.showToast('Akses ditolak!', 'error');
-                    window.fb.deleteDoc(this.getDoc('books', id.toString()));
-                    this.showToast('Buku dihapus permanen');
+                    if (this.isCloudConnected) {
+                        window.fb.deleteDoc(this.getDoc('books', id.toString()));
+                    } else {
+                        this.books = this.books.filter(b => b.id.toString() !== id.toString());
+                    }
+                    this.showToast('Buku dihapus permanen', 'success');
                 },
 
                 addMember() {
                     const newId = this.nextMemberId;
                     const id = Date.now().toString();
                     const photo = this.newMember.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(this.newMember.name) + '&background=0D8ABC&color=fff';
-                    window.fb.setDoc(this.getDoc('members', id), { ...this.newMember, id, memberId: newId, photo });
+                    const memberObj = { ...this.newMember, id, memberId: newId, photo };
+
+                    if (this.isCloudConnected) {
+                        window.fb.setDoc(this.getDoc('members', id), memberObj);
+                    } else {
+                        this.members.unshift(memberObj);
+                    }
+
                     this.showAddMemberModal = false;
                     this.resetMemberForm();
-                    this.showToast('Anggota ditambahkan ke Cloud!');
+                    this.showToast('Anggota berhasil ditambahkan!');
+                    this.$nextTick(() => lucide.createIcons());
                 },
+
                 updateMember() {
-                    window.fb.updateDoc(this.getDoc('members', this.editingMember.id.toString()), this.editingMember);
+                    if (this.isCloudConnected) {
+                        window.fb.updateDoc(this.getDoc('members', this.editingMember.id.toString()), this.editingMember);
+                    } else {
+                        const index = this.members.findIndex(m => m.id.toString() === this.editingMember.id.toString());
+                        if (index !== -1) this.members[index] = { ...this.editingMember };
+                    }
                     this.showEditMemberModal = false; 
                     this.showToast('Data anggota diperbarui!');
                 },
+
                 deleteMember(id) { 
                     if(this.staffRole !== 'Admin') return this.showToast('Akses ditolak!', 'error');
-                    window.fb.deleteDoc(this.getDoc('members', id.toString()));
-                    this.showToast('Anggota dihapus permanen');
+                    if (this.isCloudConnected) {
+                        window.fb.deleteDoc(this.getDoc('members', id.toString()));
+                    } else {
+                        this.members = this.members.filter(m => m.id.toString() !== id.toString());
+                    }
+                    this.showToast('Anggota dihapus permanen', 'success');
                 },
 
                 addCollection() {
                     const id = Date.now().toString();
-                    window.fb.setDoc(this.getDoc('collections', id), { ...this.newCollection, id });
+                    const colObj = { ...this.newCollection, id };
+
+                    if (this.isCloudConnected) {
+                        window.fb.setDoc(this.getDoc('collections', id), colObj);
+                    } else {
+                        this.collections.unshift(colObj);
+                    }
+
                     this.showAddCollectionModal = false;
                     this.newCollection = { type: 'Fisik', jenis: '', judul: '', jumlahJudul: 1, jumlahEksemplar: 1 };
-                    this.showToast('Koleksi ditambahkan ke Cloud!');
+                    this.showToast('Koleksi berhasil ditambahkan!');
                 },
+
                 updateCollection() {
-                    window.fb.updateDoc(this.getDoc('collections', this.editingCollection.id.toString()), this.editingCollection);
+                    if (this.isCloudConnected) {
+                        window.fb.updateDoc(this.getDoc('collections', this.editingCollection.id.toString()), this.editingCollection);
+                    } else {
+                        const index = this.collections.findIndex(c => c.id.toString() === this.editingCollection.id.toString());
+                        if (index !== -1) this.collections[index] = { ...this.editingCollection };
+                    }
                     this.showEditCollectionModal = false; 
                     this.showToast('Inventaris diperbarui!');
                 },
+
                 deleteCollection(id) {
                     if(this.staffRole !== 'Admin') return this.showToast('Akses ditolak!', 'error');
-                    window.fb.deleteDoc(this.getDoc('collections', id.toString()));
-                    this.showToast('Koleksi dihapus permanen');
+                    if (this.isCloudConnected) {
+                        window.fb.deleteDoc(this.getDoc('collections', id.toString()));
+                    } else {
+                        this.collections = this.collections.filter(c => c.id.toString() !== id.toString());
+                    }
+                    this.showToast('Koleksi dihapus permanen', 'success');
                 },
 
                 saveJournal() {
                     if(!this.newJournal.title || !this.newJournal.summary) return;
                     const id = Date.now().toString();
-                    window.fb.setDoc(this.getDoc('journals', id), {
-                        id, memberId: this.currentUser.id.toString(), ...this.newJournal
-                    });
-                    this.showToast('Jurnal membaca tersimpan ke Cloud!');
+                    const journalObj = { id, memberId: this.currentUser.id.toString(), ...this.newJournal };
+
+                    if (this.isCloudConnected) {
+                        window.fb.setDoc(this.getDoc('journals', id), journalObj);
+                    } else {
+                        this.journals.unshift(journalObj);
+                    }
+
+                    this.showToast('Jurnal membaca tersimpan!');
                     this.newJournal = { date: new Date().toISOString().split('T')[0], title: '', author: '', publisher: '', pages: '', summary: '' };
                 },
 
@@ -380,7 +460,7 @@
                             const img = new Image();
                             img.onload = () => {
                                 const canvas = document.createElement('canvas');
-                                const MAX_WIDTH = 200; // Kecil khusus avatar
+                                const MAX_WIDTH = 200; 
                                 let width = img.width; let height = img.height;
                                 if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
                                 canvas.width = width; canvas.height = height;
@@ -389,7 +469,13 @@
                                 
                                 const compressedData = canvas.toDataURL('image/jpeg', 0.8);
                                 this.currentUser.photo = compressedData;
-                                window.fb.updateDoc(this.getDoc('members', this.currentUser.id.toString()), { photo: compressedData });
+                                
+                                if (this.isCloudConnected) {
+                                    window.fb.updateDoc(this.getDoc('members', this.currentUser.id.toString()), { photo: compressedData });
+                                } else {
+                                    const index = this.members.findIndex(m => m.id.toString() === this.currentUser.id.toString());
+                                    if(index !== -1) { this.members[index].photo = compressedData; }
+                                }
                                 this.showToast('Foto profil berhasil diunggah!');
                             };
                             img.src = e.target.result;
@@ -398,14 +484,14 @@
                     }
                 },
 
-                // LOGIKA TRANSAKSI -------------------------------------
+                // LOGIKA TRANSAKSI FALLBACK
                 addLoan() {
                     const bookId = this.newLoan.bookId.toString();
                     const book = this.books.find(b => b.id.toString() === bookId);
                     
                     if(book && book.stock > 0) {
                         const loanId = Date.now().toString();
-                        window.fb.setDoc(this.getDoc('loans', loanId), {
+                        const loanObj = {
                             id: loanId,
                             memberId: this.newLoan.memberId.toString(),
                             bookId: bookId,
@@ -413,12 +499,20 @@
                             dueDate: this.newLoan.dueDate,
                             returnDate: null,
                             status: 'Dipinjam'
-                        });
-                        window.fb.updateDoc(this.getDoc('books', bookId), { stock: book.stock - 1 });
+                        };
+
+                        if (this.isCloudConnected) {
+                            window.fb.setDoc(this.getDoc('loans', loanId), loanObj);
+                            window.fb.updateDoc(this.getDoc('books', bookId), { stock: book.stock - 1 });
+                        } else {
+                            this.loans.unshift(loanObj);
+                            book.stock -= 1;
+                        }
                         
                         this.showAddLoanModal = false;
                         this.newLoan = { memberId: '', bookId: '', borrowDate: '', dueDate: '' };
-                        this.showToast('Transaksi berhasil direkam ke Cloud!');
+                        this.showToast('Transaksi berhasil direkam!');
+                        this.$nextTick(() => lucide.createIcons());
                     } else {
                         this.showToast('Gagal! Stok buku kosong.', 'error');
                     }
@@ -430,7 +524,7 @@
                     
                     if(book && book.stock > 0) {
                         const loanId = Date.now().toString();
-                        window.fb.setDoc(this.getDoc('loans', loanId), {
+                        const loanObj = {
                             id: loanId,
                             memberId: this.newLoan.memberId.toString(),
                             bookId: bookId,
@@ -438,13 +532,21 @@
                             dueDate: this.newLoan.dueDate,
                             returnDate: null,
                             status: 'Dipinjam'
-                        });
-                        window.fb.updateDoc(this.getDoc('books', bookId), { stock: book.stock - 1 });
+                        };
+
+                        if (this.isCloudConnected) {
+                            window.fb.setDoc(this.getDoc('loans', loanId), loanObj);
+                            window.fb.updateDoc(this.getDoc('books', bookId), { stock: book.stock - 1 });
+                        } else {
+                            this.loans.unshift(loanObj);
+                            book.stock -= 1;
+                        }
                         
                         this.showMemberLoanModal = false;
                         this.newLoan = { memberId: '', bookId: '', borrowDate: '', dueDate: '' };
                         this.showToast('Buku berhasil dipinjam!');
                         this.memberTab = 'loans';
+                        this.$nextTick(() => lucide.createIcons());
                     } else {
                         this.showToast('Gagal! Stok buku kosong.', 'error');
                     }
@@ -454,26 +556,37 @@
                     const loan = this.loans.find(l => l.id.toString() === id.toString());
                     if(loan && loan.status === 'Dipinjam') {
                         const returnD = new Date().toISOString().split('T')[0];
-                        
-                        window.fb.updateDoc(this.getDoc('loans', loan.id.toString()), { 
-                            status: 'Dikembalikan', returnDate: returnD 
-                        });
-                        
                         const book = this.books.find(b => b.id.toString() === loan.bookId.toString());
-                        if(book) {
-                            window.fb.updateDoc(this.getDoc('books', book.id.toString()), { stock: book.stock + 1 });
+                        
+                        if (this.isCloudConnected) {
+                            window.fb.updateDoc(this.getDoc('loans', loan.id.toString()), { status: 'Dikembalikan', returnDate: returnD });
+                            if(book) window.fb.updateDoc(this.getDoc('books', book.id.toString()), { stock: book.stock + 1 });
+                        } else {
+                            loan.status = 'Dikembalikan';
+                            loan.returnDate = returnD;
+                            if(book) book.stock += 1;
+                            this.loans = [...this.loans];
+                            this.books = [...this.books];
                         }
                         this.showToast('Buku selesai dikembalikan!');
                     }
                 },
 
-                // FITUR UTILITIES & AUTH (Local)
+                // UTILITIES
                 goToLogin(role) {
                     this.loginRole = role; this.appState = 'login';
                     this.loginUsername = ''; this.loginPassword = ''; this.loginId = '';
                     this.mobileMenuOpen = false; this.$nextTick(() => lucide.createIcons());
                 },
-
+                doLogout() {
+                    this.currentUser = null;
+                    this.staffRole = '';
+                    this.appState = 'home';
+                    this.activeTab = 'dashboard';
+                    this.memberTab = 'dashboard';
+                    this.hasFilledGuestbook = false; 
+                    this.$nextTick(() => lucide.createIcons());
+                },
                 openFlipbook(book) {
                     const isCurrentlyBorrowedByMe = this.currentUser && this.currentUser.role === 'member' && 
                                                     this.loans.some(l => l.memberId.toString() === this.currentUser.id.toString() && l.bookId.toString() === book.id.toString() && l.status === 'Dipinjam');
@@ -485,7 +598,6 @@
                     this.showFlipbookModal = true;
                     this.$nextTick(() => lucide.createIcons());
                 },
-
                 requestLoan(book) {
                     const isCurrentlyBorrowedByMe = this.currentUser && this.currentUser.role === 'member' && 
                                                     this.loans.some(l => l.memberId.toString() === this.currentUser.id.toString() && l.bookId.toString() === book.id.toString() && l.status === 'Dipinjam');
@@ -506,7 +618,6 @@
                     this.showMemberLoanModal = true;
                 },
 
-                // GETTERS (Pencarian & Relasi)
                 getMemberName(id) { const m = this.members.find(x => x.id.toString() === id.toString()); return m ? m.name : 'Anggota Terhapus'; },
                 getBookTitle(id) { const b = this.books.find(x => x.id.toString() === id.toString()); return b ? b.title : 'Buku Terhapus'; },
 
@@ -563,7 +674,6 @@
                     return res;
                 },
 
-                // EXPORT
                 exportToExcel() {
                     let tables = document.querySelectorAll('#report-print-area table'); let visibleTable = null;
                     tables.forEach(t => { if (t.offsetParent !== null) visibleTable = t; });
@@ -590,6 +700,10 @@
 
                 resetBookForm() { this.newBook = { title: '', author: '', code: '', category: 'Novel', stock: 1, cover: '', link: '' }; },
                 resetMemberForm() { this.newMember = { name: '', class: '', address: '', photo: '' }; },
+                prepareEditBook(book) { this.editingBook = { ...book }; this.showEditBookModal = true; this.$nextTick(() => lucide.createIcons()); },
+                prepareEditMember(member) { this.editingMember = { ...member }; this.showEditMemberModal = true; this.$nextTick(() => lucide.createIcons()); },
+                prepareEditCollection(col) { this.editingCollection = { ...col }; this.showEditCollectionModal = true; },
+                
                 getCurrentLabel() {
                     const allItems = [...this.adminMenuItems, {id:'loans', label:'Peminjaman'}, {id:'reports', label:'Laporan'}, {id:'settings', label:'Pengaturan Web'}];
                     const item = allItems.find(i => i.id === this.activeTab);
@@ -639,24 +753,21 @@
         <span class="font-black text-sm" x-text="toast.message"></span>
     </div>
 
-    <!-- KOMPONEN HEADER PUBLIK (Dengan Hamburger Menu & Dropdown Koleksi) -->
+    <!-- KOMPONEN HEADER PUBLIK -->
     <template x-if="appState === 'home' || appState === 'catalog' || appState === 'collections'">
         <header class="bg-white/90 backdrop-blur-xl border-b border-slate-200 fixed w-full top-0 z-50 px-4 md:px-6 h-20 flex items-center justify-between shadow-sm">
             <div class="flex items-center space-x-2 sm:space-x-3 cursor-pointer overflow-hidden" @click="appState = 'home'; mobileMenuOpen = false">
                 <div class="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30 flex-shrink-0 relative">
                     <i data-lucide="book-open" class="w-4 h-4 sm:w-6 sm:h-6"></i>
-                    <!-- Indikator Cloud -->
                     <span x-show="isCloudConnected" class="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white cloud-ping" title="Terhubung ke Cloud Database"></span>
                 </div>
                 <h1 class="text-sm sm:text-xl font-black text-slate-800 truncate max-w-[140px] sm:max-w-md" x-text="siteSettings.libraryName"></h1>
             </div>
             
-            <!-- Menu Desktop -->
             <div class="hidden lg:flex items-center space-x-8">
                 <a href="#" @click.prevent="appState = 'home'" class="text-sm font-bold transition-colors" :class="appState === 'home' ? 'text-blue-600 font-black' : 'text-slate-500 hover:text-slate-800'">Beranda</a>
                 <a href="#" @click.prevent="appState = 'catalog'" class="text-sm font-bold transition-colors" :class="appState === 'catalog' ? 'text-blue-600 font-black' : 'text-slate-500 hover:text-slate-800'">Katalog Buku</a>
                 
-                <!-- Dropdown Koleksi -->
                 <div class="relative">
                     <button @click="showKoleksiDropdown = !showKoleksiDropdown" @click.away="showKoleksiDropdown = false" class="flex items-center space-x-1 text-sm font-bold transition-colors" :class="appState === 'collections' ? 'text-blue-600 font-black' : 'text-slate-500 hover:text-slate-800'">
                         <span>Koleksi</span>
@@ -669,19 +780,16 @@
                 </div>
             </div>
 
-            <!-- Tombol Kanan & Hamburger -->
             <div class="flex items-center space-x-2">
                 <button @click="goToLogin('member')" class="hidden sm:block bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-black hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition-all hover:-translate-y-0.5">Masuk</button>
                 <button @click="goToLogin('admin')" class="hidden sm:flex bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-black hover:bg-slate-800 shadow-lg transition-all hover:-translate-y-0.5 items-center space-x-2">
                     <i data-lucide="shield" class="w-4 h-4"></i><span>Staf</span>
                 </button>
-                <!-- Hamburger Button -->
                 <button @click="mobileMenuOpen = !mobileMenuOpen" class="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
                     <i data-lucide="menu" class="w-6 h-6"></i>
                 </button>
             </div>
             
-            <!-- Mobile Menu Dropdown -->
             <div x-show="mobileMenuOpen" @click.away="mobileMenuOpen = false" x-transition class="absolute top-20 left-0 w-full bg-white border-b border-slate-200 shadow-lg lg:hidden flex flex-col py-4 px-6 space-y-4">
                 <a href="#" @click.prevent="appState = 'home'; mobileMenuOpen = false" class="text-base font-black text-slate-700 border-b border-slate-100 pb-2">Beranda</a>
                 <a href="#" @click.prevent="appState = 'catalog'; mobileMenuOpen = false" class="text-base font-black text-slate-700 border-b border-slate-100 pb-2">Katalog Buku</a>
@@ -825,7 +933,6 @@
                         </thead>
                         <tbody class="divide-y divide-slate-50">
                             <template x-for="col in publicFilteredCollections" :key="col.id">
-                                <!-- Filter dengan Pencarian -->
                                 <tr class="hover:bg-slate-50/50 transition-colors" x-show="!searchQuery || col.jenis.toLowerCase().includes(searchQuery.toLowerCase()) || col.judul.toLowerCase().includes(searchQuery.toLowerCase())">
                                     <td class="p-4 md:p-6 pl-4 md:pl-8 font-black text-slate-800 text-sm md:text-base" x-text="col.jenis"></td>
                                     <td class="p-4 md:p-6 font-bold text-slate-600 text-xs md:text-sm" x-text="col.judul"></td>
@@ -1287,7 +1394,7 @@
                                 <div class="p-3 md:p-4 bg-emerald-50 text-emerald-600 rounded-xl md:rounded-2xl"><i data-lucide="users"></i></div>
                             </div>
                             <h3 class="text-2xl md:text-4xl font-black text-slate-800" x-text="members.length"></h3>
-                            <span class="text-[10px] md:text-xs font-black text-slate-500 uppercase">Anggota Cloud</span>
+                            <span class="text-[10px] md:text-xs font-black text-slate-500 uppercase">Anggota Terdaftar</span>
                         </div>
                         <div class="bg-white p-5 md:p-8 rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm text-center md:text-left">
                             <div class="hidden md:flex justify-between items-start mb-6">
@@ -1974,99 +2081,4 @@
                         <input :value="nextMemberId" type="text" readonly class="w-full p-3 sm:p-4 bg-slate-100 text-slate-400 border-none rounded-xl sm:rounded-2xl font-black text-sm cursor-not-allowed">
                     </div>
                     <div class="space-y-1.5 sm:space-y-2">
-                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kelas *</label>
-                        <input x-model="newMember.class" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="Contoh: X-IPA-1">
-                    </div>
-                </div>
-                <div class="space-y-1.5 sm:space-y-2">
-                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Upload Foto (Opsional)</label>
-                    <input type="file" @change="handleFileUpload($event, newMember, 'photo')" accept="image/*" class="w-full p-2.5 sm:p-3 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] sm:file:text-xs file:font-black file:bg-blue-50 file:text-blue-700">
-                </div>
-            </div>
-            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
-                <button type="button" @click="showAddMemberModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
-                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-emerald-600 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all text-sm">Simpan</button>
-            </div>
-        </form>
-    </div>
-
-    <!-- MODAL: EDIT ANGGOTA (ADMIN) -->
-    <div x-show="showEditMemberModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
-        <form @submit.prevent="updateMember" class="bg-white rounded-[24px] sm:rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 m-auto mt-16 sm:mt-auto">
-            <div class="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center">
-                <h3 class="text-xl sm:text-2xl font-black text-slate-800">Edit Anggota</h3>
-                <button type="button" @click="showEditMemberModal = false" class="p-2 sm:p-3 hover:bg-slate-100 rounded-lg sm:rounded-2xl text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <div class="p-5 sm:p-8 space-y-4 sm:space-y-6">
-                <div class="space-y-1.5 sm:space-y-2">
-                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Nama Lengkap *</label>
-                    <input x-model="editingMember.name" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                    <div class="space-y-1.5 sm:space-y-2">
-                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Nomor Induk (ID) *</label>
-                        <input x-model="editingMember.memberId" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
-                    </div>
-                    <div class="space-y-1.5 sm:space-y-2">
-                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kelas *</label>
-                        <input x-model="editingMember.class" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
-                    </div>
-                </div>
-                <div class="space-y-1.5 sm:space-y-2">
-                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Ganti Foto (Opsional)</label>
-                    <input type="file" @change="handleFileUpload($event, editingMember, 'photo')" accept="image/*" class="w-full p-2.5 sm:p-3 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] sm:file:text-xs file:font-black file:bg-blue-50 file:text-blue-700">
-                </div>
-            </div>
-            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
-                <button type="button" @click="showEditMemberModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
-                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-blue-600 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all text-sm">Simpan Perubahan</button>
-            </div>
-        </form>
-    </div>
-
-    <!-- MODAL: TAMBAH PEMINJAMAN (ADMIN) -->
-    <div x-show="showAddLoanModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-md overflow-y-auto">
-        <form @submit.prevent="addLoan" class="bg-white rounded-[24px] sm:rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 m-auto mt-16 sm:mt-auto">
-            <div class="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center">
-                <h3 class="text-xl sm:text-2xl font-black text-slate-800">Transaksi Baru</h3>
-                <button type="button" @click="showAddLoanModal = false" class="p-2 sm:p-3 hover:bg-slate-100 rounded-lg sm:rounded-2xl text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <div class="p-5 sm:p-8 space-y-4 sm:space-y-6">
-                <div class="space-y-1.5 sm:space-y-2">
-                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Pilih Anggota *</label>
-                    <select x-model="newLoan.memberId" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
-                        <option value="">-- Pilih Peminjam --</option>
-                        <template x-for="m in members" :key="m.id">
-                            <option :value="m.id" x-text="m.memberId + ' - ' + m.name"></option>
-                        </template>
-                    </select>
-                </div>
-                <div class="space-y-1.5 sm:space-y-2">
-                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Pilih Buku *</label>
-                    <select x-model="newLoan.bookId" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
-                        <option value="">-- Pilih Buku Tersedia --</option>
-                        <template x-for="b in books" :key="b.id">
-                            <option x-show="b.stock > 0" :value="b.id" x-text="b.code + ' - ' + b.title + ' (Sisa: ' + b.stock + ')'"></option>
-                        </template>
-                    </select>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                    <div class="space-y-1.5 sm:space-y-2">
-                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Tgl Pinjam *</label>
-                        <input x-model="newLoan.borrowDate" type="date" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
-                    </div>
-                    <div class="space-y-1.5 sm:space-y-2">
-                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Tgl Kembali *</label>
-                        <input x-model="newLoan.dueDate" type="date" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
-                    </div>
-                </div>
-            </div>
-            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
-                <button type="button" @click="showAddLoanModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
-                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-amber-500 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-amber-100 hover:bg-amber-600 transition-all text-sm">Konfirmasi</button>
-            </div>
-        </form>
-    </div>
-
-</body>
-</html>
+                        <label class="text-
