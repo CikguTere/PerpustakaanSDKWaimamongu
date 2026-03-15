@@ -147,9 +147,6 @@
 
                     if(window.fb) {
                         try {
-                            // ======================================================================
-                            // ⚠️ PENTING: GANTI NILAI DI BAWAH INI DENGAN FIREBASE CONFIG ASLI ANDA
-                            // ======================================================================
                             const firebaseConfig = {
                                 apiKey: "AIzaSyASgFqPwhJEcxDpiQqZ3Sg1WqUHp3yHZ4I",
                                 authDomain: "perpustakaan-digital-sd.firebaseapp.com",
@@ -171,7 +168,7 @@
                             this.auth = window.fb.getAuth(app);
                             this.db = window.fb.getFirestore(app);
 
-                            // Menggunakan Autentikasi Anonim (Harus diaktifkan di Firebase Console)
+                            // Menggunakan Autentikasi Anonim
                             await window.fb.signInAnonymously(this.auth);
 
                             window.fb.onAuthStateChanged(this.auth, (user) => {
@@ -578,6 +575,35 @@
                     this.loginUsername = ''; this.loginPassword = ''; this.loginId = '';
                     this.mobileMenuOpen = false; this.$nextTick(() => lucide.createIcons());
                 },
+                
+                doLogin() {
+                    if (this.loginRole === 'admin') {
+                        if (this.loginUsername === 'admin' && this.loginPassword === 'admin123') {
+                            this.currentUser = { name: 'Super Admin', role: 'staff' };
+                            this.staffRole = 'Admin';
+                            this.appState = 'admin';
+                            this.$nextTick(() => { lucide.createIcons(); this.renderChart(); });
+                        } else if (this.loginUsername === 'petugas' && this.loginPassword === 'petugas123') {
+                            this.currentUser = { name: 'Petugas Perpus', role: 'staff' };
+                            this.staffRole = 'Petugas';
+                            this.appState = 'admin';
+                            this.$nextTick(() => { lucide.createIcons(); this.renderChart(); });
+                        } else {
+                            this.showToast('Username atau Kata sandi salah!', 'error');
+                        }
+                    } else {
+                        const member = this.members.find(m => m.memberId === this.loginId);
+                        if (member) {
+                            this.currentUser = { ...member, role: 'member' };
+                            this.memberTab = 'dashboard';
+                            this.appState = 'member';
+                            this.$nextTick(() => { lucide.createIcons(); });
+                        } else {
+                            this.showToast('Nomor Anggota tidak ditemukan!', 'error');
+                        }
+                    }
+                },
+
                 doLogout() {
                     this.currentUser = null;
                     this.staffRole = '';
@@ -587,6 +613,7 @@
                     this.hasFilledGuestbook = false; 
                     this.$nextTick(() => lucide.createIcons());
                 },
+                
                 openFlipbook(book) {
                     const isCurrentlyBorrowedByMe = this.currentUser && this.currentUser.role === 'member' && 
                                                     this.loans.some(l => l.memberId.toString() === this.currentUser.id.toString() && l.bookId.toString() === book.id.toString() && l.status === 'Dipinjam');
@@ -2081,4 +2108,99 @@
                         <input :value="nextMemberId" type="text" readonly class="w-full p-3 sm:p-4 bg-slate-100 text-slate-400 border-none rounded-xl sm:rounded-2xl font-black text-sm cursor-not-allowed">
                     </div>
                     <div class="space-y-1.5 sm:space-y-2">
-                        <label class="text-
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kelas *</label>
+                        <input x-model="newMember.class" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="Contoh: X-IPA-1">
+                    </div>
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Upload Foto (Opsional)</label>
+                    <input type="file" @change="handleFileUpload($event, newMember, 'photo')" accept="image/*" class="w-full p-2.5 sm:p-3 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] sm:file:text-xs file:font-black file:bg-blue-50 file:text-blue-700">
+                </div>
+            </div>
+            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
+                <button type="button" @click="showAddMemberModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
+                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-emerald-600 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all text-sm">Simpan</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- MODAL: EDIT ANGGOTA (ADMIN) -->
+    <div x-show="showEditMemberModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+        <form @submit.prevent="updateMember" class="bg-white rounded-[24px] sm:rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 m-auto mt-16 sm:mt-auto">
+            <div class="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl sm:text-2xl font-black text-slate-800">Edit Anggota</h3>
+                <button type="button" @click="showEditMemberModal = false" class="p-2 sm:p-3 hover:bg-slate-100 rounded-lg sm:rounded-2xl text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 sm:p-8 space-y-4 sm:space-y-6">
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Nama Lengkap *</label>
+                    <input x-model="editingMember.name" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Nomor Induk (ID) *</label>
+                        <input x-model="editingMember.memberId" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kelas *</label>
+                        <input x-model="editingMember.class" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Ganti Foto (Opsional)</label>
+                    <input type="file" @change="handleFileUpload($event, editingMember, 'photo')" accept="image/*" class="w-full p-2.5 sm:p-3 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] sm:file:text-xs file:font-black file:bg-blue-50 file:text-blue-700">
+                </div>
+            </div>
+            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
+                <button type="button" @click="showEditMemberModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
+                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-blue-600 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all text-sm">Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- MODAL: TAMBAH PEMINJAMAN (ADMIN) -->
+    <div x-show="showAddLoanModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-md overflow-y-auto">
+        <form @submit.prevent="addLoan" class="bg-white rounded-[24px] sm:rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 m-auto mt-16 sm:mt-auto">
+            <div class="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl sm:text-2xl font-black text-slate-800">Transaksi Baru</h3>
+                <button type="button" @click="showAddLoanModal = false" class="p-2 sm:p-3 hover:bg-slate-100 rounded-lg sm:rounded-2xl text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 sm:p-8 space-y-4 sm:space-y-6">
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Pilih Anggota *</label>
+                    <select x-model="newLoan.memberId" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                        <option value="">-- Pilih Peminjam --</option>
+                        <template x-for="m in members" :key="m.id">
+                            <option :value="m.id" x-text="m.memberId + ' - ' + m.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Pilih Buku *</label>
+                    <select x-model="newLoan.bookId" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                        <option value="">-- Pilih Buku Tersedia --</option>
+                        <template x-for="b in books" :key="b.id">
+                            <option x-show="b.stock > 0" :value="b.id" x-text="b.code + ' - ' + b.title + ' (Sisa: ' + b.stock + ')'"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Tgl Pinjam *</label>
+                        <input x-model="newLoan.borrowDate" type="date" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Tgl Kembali *</label>
+                        <input x-model="newLoan.dueDate" type="date" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                </div>
+            </div>
+            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
+                <button type="button" @click="showAddLoanModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
+                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-amber-500 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-amber-100 hover:bg-amber-600 transition-all text-sm">Konfirmasi</button>
+            </div>
+        </form>
+    </div>
+
+</body>
+</html>
