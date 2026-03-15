@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PerpusSmart Premium</title>
+    <title>PerpusSmart Cloud (Real-time)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js -->
@@ -13,14 +13,28 @@
     <!-- HTML2PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
+    <!-- FIREBASE SDK IMPORT -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Expose ke window agar AlpineJS bisa menggunakannya
+        window.fb = {
+            initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+            getFirestore, collection, doc, setDoc, getDoc, onSnapshot, addDoc, updateDoc, deleteDoc
+        };
+    </script>
+
     <script>
         function libraryApp() {
             return {
                 // APP STATE
                 appState: 'home',
-                mobileMenuOpen: false, // Untuk menu HP
-                showKoleksiDropdown: false, // Untuk Dropdown Koleksi Desktop
-                collectionTypeView: 'Digital', // 'Digital' atau 'Fisik' untuk halaman publik
+                mobileMenuOpen: false,
+                showKoleksiDropdown: false, 
+                collectionTypeView: 'Digital',
+                isCloudConnected: false, // Status Database
                 
                 // TOAST NOTIFICATIONS
                 toast: { show: false, message: '', type: 'success' },
@@ -42,7 +56,7 @@
                 memberTab: 'dashboard', 
 
                 // SETTINGS
-                siteSettings: JSON.parse(localStorage.getItem('perpusSettings')) || {
+                siteSettings: {
                     libraryName: 'Perpustakaan SD Katholik Waimamongu',
                     welcomeMessage: 'Jelajahi Dunia Pengetahuan Melalui Koleksi Digital Kami.',
                     waNumber: '6281234567890'
@@ -77,19 +91,13 @@
                 // Forms State
                 newBook: { title: '', author: '', code: '', category: 'Novel', stock: 1, cover: '', link: '' },
                 editingBook: { id: null, title: '', author: '', code: '', category: '', stock: 0, cover: '', link: '' },
-                
                 newMember: { name: '', class: '', address: '', photo: '' },
                 editingMember: { id: null, name: '', memberId: '', class: '', address: '', photo: '' },
-                
                 selectedMember: { name: '', photo: '', memberId: '', class: '' },
-                
                 newLoan: { memberId: '', bookId: '', borrowDate: '', dueDate: '' },
                 reportConfig: { type: 'buku', startDate: '', endDate: '' },
-
                 newJournal: { date: new Date().toISOString().split('T')[0], title: '', author: '', publisher: '', pages: '', summary: '' },
                 guestbookEntry: { date: new Date().toISOString().split('T')[0], name: '', institution: '', district: '', province: '', type: 'Umum' },
-                
-                // Form Koleksi Baru
                 newCollection: { type: 'Fisik', jenis: '', judul: '', jumlahJudul: 1, jumlahEksemplar: 1 },
                 editingCollection: { id: null, type: 'Fisik', jenis: '', judul: '', jumlahJudul: 1, jumlahEksemplar: 1 },
 
@@ -97,29 +105,124 @@
                     { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
                     { id: 'books', label: 'Data Buku', icon: 'book' },
                     { id: 'members', label: 'Data Anggota', icon: 'users' },
-                    { id: 'collections', label: 'Inventaris Koleksi', icon: 'layers' } // Menu Baru
+                    { id: 'collections', label: 'Inventaris Koleksi', icon: 'layers' }
                 ],
 
-                // Initial Data
-                books: [
-                    { id: 1, code: 'B001', title: 'Laskar Pelangi', author: 'Andrea Hirata', category: 'Novel', stock: 5, cover: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400', link: 'https://mozilla.github.io/pdf.js/web/viewer.html?file=https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf' },
-                    { id: 2, code: 'B002', title: 'Bumi Manusia', author: 'Pramoedya Ananta Toer', category: 'Fiksi', stock: 3, cover: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=400', link: 'https://mozilla.github.io/pdf.js/web/viewer.html?file=https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf' },
-                    { id: 3, code: 'B003', title: 'Sapiens', author: 'Yuval Noah Harari', category: 'Sejarah', stock: 2, cover: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?w=400', link: 'https://mozilla.github.io/pdf.js/web/viewer.html?file=https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf' }
-                ],
-                collections: [
-                    { id: 1, type: 'Fisik', jenis: 'Buku Teks Pelajaran', judul: 'Matematika SD Kelas 6', jumlahJudul: 1, jumlahEksemplar: 35 },
-                    { id: 2, type: 'Digital', jenis: 'Modul Interaktif', judul: 'Panduan Belajar IPA Terpadu', jumlahJudul: 1, jumlahEksemplar: 100 }
-                ],
-                members: [
-                    { id: 1, memberId: 'M1001', name: 'Rizky Ramadhan', class: 'XII-IPA-1', address: 'Jl. Melati No. 12, Bandung', photo: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200' }
-                ],
+                // Firebase State References
+                db: null,
+                auth: null,
+                appId: null,
+                dbUser: null,
+                seeded: false,
+
+                // Data Array Real-time
+                books: [],
+                collections: [],
+                members: [],
                 loans: [],
                 journals: [],
+
+                // Mock Data (hanya digunakan sekali jika DB kosong untuk visual awal)
+                mockBooks: [
+                    { id: "1", code: 'B001', title: 'Laskar Pelangi', author: 'Andrea Hirata', category: 'Novel', stock: 5, cover: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400', link: 'https://mozilla.github.io/pdf.js/web/viewer.html?file=https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf' },
+                    { id: "2", code: 'B002', title: 'Bumi Manusia', author: 'Pramoedya Ananta Toer', category: 'Fiksi', stock: 3, cover: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=400', link: 'https://mozilla.github.io/pdf.js/web/viewer.html?file=https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf' }
+                ],
+                mockCollections: [
+                    { id: "1", type: 'Fisik', jenis: 'Buku Teks Pelajaran', judul: 'Matematika SD Kelas 6', jumlahJudul: 1, jumlahEksemplar: 35 },
+                    { id: "2", type: 'Digital', jenis: 'Modul Interaktif', judul: 'Panduan Belajar IPA Terpadu', jumlahJudul: 1, jumlahEksemplar: 100 }
+                ],
                 
-                init() {
+                async init() {
                     this.$watch('activeTab', () => { this.searchQuery = ''; });
                     this.$watch('memberTab', () => { this.searchQuery = ''; this.$nextTick(() => lucide.createIcons()); });
                     this.$nextTick(() => { lucide.createIcons(); });
+
+                    // Memulai koneksi ke Firebase Database
+                    let checks = 0;
+                    while(!window.fb && checks < 50) { await new Promise(r => setTimeout(r, 100)); checks++; }
+
+                    if(window.fb) {
+                        try {
+                            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+                            this.appId = typeof __app_id !== 'undefined' ? __app_id : 'perpus-app-db';
+
+                            if (!firebaseConfig) { console.warn("Menjalankan mode lokal (Tanpa Cloud)."); return; }
+
+                            const app = window.fb.initializeApp(firebaseConfig);
+                            this.auth = window.fb.getAuth(app);
+                            this.db = window.fb.getFirestore(app);
+
+                            // Firebase Rule 3: Autentikasi sebelum kueri
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                await window.fb.signInWithCustomToken(this.auth, __initial_auth_token);
+                            } else {
+                                await window.fb.signInAnonymously(this.auth);
+                            }
+
+                            window.fb.onAuthStateChanged(this.auth, (user) => {
+                                this.dbUser = user;
+                                if (user) this.setupRealtimeListeners();
+                            });
+                        } catch (e) { console.error("Error Koneksi Database:", e); }
+                    }
+                },
+
+                // Helpers Firebase Rule 1: Struktur Path Data ketat
+                getCol(name) { return window.fb.collection(this.db, 'artifacts', this.appId, 'public', 'data', name); },
+                getDoc(name, id) { return window.fb.doc(this.db, 'artifacts', this.appId, 'public', 'data', name, id.toString()); },
+
+                setupRealtimeListeners() {
+                    if (!this.dbUser) return;
+                    this.isCloudConnected = true;
+
+                    // Fungsi pembantu untuk sinkronisasi Collection otomatis
+                    const syncCollection = (colName, arrayName) => {
+                        window.fb.onSnapshot(this.getCol(colName), (snapshot) => {
+                            if(!snapshot.empty) {
+                                // Urutkan data terbaru di atas
+                                let data = snapshot.docs.map(doc => doc.data());
+                                data.sort((a,b) => b.id - a.id);
+                                this[arrayName] = data;
+                            } else if (this.seeded) {
+                                this[arrayName] = [];
+                            }
+                            this.$nextTick(() => lucide.createIcons());
+                        }, (e) => console.error("Sync Error:", e));
+                    };
+
+                    // Cek & Seed Data Awal ke DB (Jika kosong)
+                    window.fb.getDoc(this.getDoc('settings', 'global')).then(docSnap => {
+                        if (!docSnap.exists()) {
+                            this.seeded = false;
+                            this.mockBooks.forEach(b => window.fb.setDoc(this.getDoc('books', b.id), b));
+                            this.mockCollections.forEach(c => window.fb.setDoc(this.getDoc('collections', c.id), c));
+                            window.fb.setDoc(this.getDoc('settings', 'global'), this.siteSettings);
+                            window.fb.setDoc(this.getDoc('stats', 'visitor'), { visitorCount: 0, todayVisitorCount: 0 });
+                            this.seeded = true;
+                        } else {
+                            this.seeded = true;
+                        }
+
+                        // Mengaktifkan Listeners Real-time
+                        syncCollection('books', 'books');
+                        syncCollection('members', 'members');
+                        syncCollection('collections', 'collections');
+                        syncCollection('loans', 'loans');
+                        syncCollection('journals', 'journals');
+
+                        // Sync Settings
+                        window.fb.onSnapshot(this.getDoc('settings', 'global'), (doc) => {
+                            if(doc.exists()) this.siteSettings = doc.data();
+                        }, e => console.error(e));
+
+                        // Sync Visitor Stats
+                        window.fb.onSnapshot(this.getDoc('stats', 'visitor'), (doc) => {
+                            if(doc.exists()) {
+                                this.visitorCount = doc.data().visitorCount || 0;
+                                this.todayVisitorCount = doc.data().todayVisitorCount || 0;
+                            }
+                        }, e => console.error(e));
+                    });
                 },
 
                 showToast(message, type = 'success') {
@@ -131,203 +234,141 @@
                 },
 
                 get nextMemberId() {
-                    const lastIdNum = this.members.length > 0 ? parseInt(this.members[this.members.length - 1].memberId.replace('M', '')) : 1000;
+                    const lastIdNum = this.members.length > 0 ? parseInt(this.members[0].memberId.replace('M', '')) : 1000;
                     return 'M' + (lastIdNum + 1);
                 },
 
+                // Fitur Kompresi Gambar agar hemat memori cloud (maks 400px width)
                 handleFileUpload(event, targetObject, propertyName) {
                     const file = event.target.files[0];
                     if (file) {
                         const reader = new FileReader();
                         reader.onload = (e) => {
-                            targetObject[propertyName] = e.target.result;
+                            const img = new Image();
+                            img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                const MAX_WIDTH = 400;
+                                let width = img.width;
+                                let height = img.height;
+                                if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                                canvas.width = width; canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0, width, height);
+                                targetObject[propertyName] = canvas.toDataURL('image/jpeg', 0.7); // Kompresi JPEG 70%
+                            };
+                            img.src = e.target.result;
                         };
                         reader.readAsDataURL(file);
                     }
                 },
 
+                // DATABASE WRITES -------------------------------------
                 saveSettings() {
-                    localStorage.setItem('perpusSettings', JSON.stringify(this.siteSettings));
-                    this.showToast('Pengaturan berhasil disimpan dan diperbarui!');
+                    window.fb.setDoc(this.getDoc('settings', 'global'), this.siteSettings);
+                    this.showToast('Pengaturan berhasil disimpan di Cloud!');
                 },
 
                 submitGuestbook() {
                     if(!this.guestbookEntry.name || !this.guestbookEntry.institution || !this.guestbookEntry.district || !this.guestbookEntry.province) {
-                        this.showToast('Mohon lengkapi semua data buku tamu.', 'error');
-                        return;
+                        return this.showToast('Mohon lengkapi semua data buku tamu.', 'error');
                     }
-                    this.visitorCount++;
-                    this.todayVisitorCount++;
+                    // Update stats ke cloud
+                    window.fb.updateDoc(this.getDoc('stats', 'visitor'), { 
+                        visitorCount: this.visitorCount + 1, 
+                        todayVisitorCount: this.todayVisitorCount + 1 
+                    });
+                    
                     this.hasFilledGuestbook = true;
                     this.showGuestbookModal = false;
-                    this.showToast('Terima kasih telah mengisi buku tamu! Silakan mulai membaca.');
-                    this.$nextTick(() => lucide.createIcons());
-                },
-
-                goToLogin(role) {
-                    this.loginRole = role;
-                    this.appState = 'login';
-                    this.loginUsername = '';
-                    this.loginPassword = '';
-                    this.loginId = '';
-                    this.mobileMenuOpen = false;
-                    this.$nextTick(() => lucide.createIcons());
-                },
-
-                doLogin() {
-                    if (this.loginRole === 'admin') {
-                        if (this.loginUsername === 'admin' && this.loginPassword === 'admin123') {
-                            this.currentUser = { name: 'Super Admin', role: 'staff' };
-                            this.staffRole = 'Admin';
-                            this.appState = 'admin';
-                            this.$nextTick(() => { lucide.createIcons(); this.renderChart(); });
-                        } else if (this.loginUsername === 'petugas' && this.loginPassword === 'petugas123') {
-                            this.currentUser = { name: 'Petugas Perpus', role: 'staff' };
-                            this.staffRole = 'Petugas';
-                            this.appState = 'admin';
-                            this.$nextTick(() => { lucide.createIcons(); this.renderChart(); });
-                        } else {
-                            this.showToast('Username atau Kata sandi salah!', 'error');
-                        }
-                    } else {
-                        const member = this.members.find(m => m.memberId === this.loginId);
-                        if (member) {
-                            this.currentUser = { ...member, role: 'member' };
-                            this.memberTab = 'dashboard';
-                            this.appState = 'member';
-                            this.$nextTick(() => { lucide.createIcons(); });
-                        } else {
-                            this.showToast('Nomor Anggota tidak ditemukan!', 'error');
-                        }
-                    }
-                },
-
-                doLogout() {
-                    this.currentUser = null;
-                    this.staffRole = '';
-                    this.appState = 'home';
-                    this.activeTab = 'dashboard';
-                    this.memberTab = 'dashboard';
-                    this.hasFilledGuestbook = false; 
+                    this.showToast('Buku Tamu Tersimpan! Silakan membaca.');
                     this.$nextTick(() => lucide.createIcons());
                 },
 
                 doRegister() {
                     if(!this.newMember.name || !this.newMember.class) return;
-                    
                     const newId = this.nextMemberId;
-                    const id = Date.now();
+                    const id = Date.now().toString();
                     const photo = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(this.newMember.name) + '&background=0D8ABC&color=fff';
                     
                     const newMemberObj = { ...this.newMember, id, memberId: newId, photo };
-                    this.members.push(newMemberObj);
+                    
+                    // Simpan ke Cloud
+                    window.fb.setDoc(this.getDoc('members', id), newMemberObj);
                     
                     this.showToast(`Pendaftaran Berhasil! ID Anda: ${newId}`);
                     this.resetMemberForm();
                     
+                    // Auto Login
                     this.currentUser = { ...newMemberObj, role: 'member' };
-                    this.visitorCount += 1;
                     this.memberTab = 'dashboard';
                     this.appState = 'member';
                     this.$nextTick(() => lucide.createIcons());
                 },
 
-                openFlipbook(book) {
-                    const isCurrentlyBorrowedByMe = this.currentUser && this.currentUser.role === 'member' && 
-                                                    this.loans.some(l => l.memberId === this.currentUser.id && l.bookId === book.id && l.status === 'Dipinjam');
-                    
-                    if (book.stock <= 0 && !isCurrentlyBorrowedByMe) {
-                        this.showToast('Buku tidak tersedia, silakan tunggu pengembalian buku atau baca buku yang lain.', 'error');
-                        return;
-                    }
-                    
-                    if (!book || !book.link) {
-                        this.showToast('Maaf, link bacaan untuk buku ini belum tersedia.', 'error');
-                        return;
-                    }
-                    this.currentReadBook = book;
-                    this.showFlipbookModal = true;
-                    this.$nextTick(() => lucide.createIcons());
+                addBook() {
+                    const id = Date.now().toString();
+                    const cover = this.newBook.cover || 'https://images.unsplash.com/photo-1543004218-ee141104308d?w=400';
+                    window.fb.setDoc(this.getDoc('books', id), { ...this.newBook, id, cover });
+                    this.showAddBookModal = false;
+                    this.resetBookForm();
+                    this.showToast('Buku berhasil ditambahkan ke Cloud!');
+                },
+                updateBook() {
+                    window.fb.updateDoc(this.getDoc('books', this.editingBook.id.toString()), this.editingBook);
+                    this.showEditBookModal = false; 
+                    this.showToast('Data buku diperbarui!');
+                },
+                deleteBook(id) { 
+                    if(this.staffRole !== 'Admin') return this.showToast('Akses ditolak!', 'error');
+                    window.fb.deleteDoc(this.getDoc('books', id.toString()));
+                    this.showToast('Buku dihapus permanen');
                 },
 
-                requestLoan(book) {
-                    const isCurrentlyBorrowedByMe = this.currentUser && this.currentUser.role === 'member' && 
-                                                    this.loans.some(l => l.memberId === this.currentUser.id && l.bookId === book.id && l.status === 'Dipinjam');
-                    
-                    if (isCurrentlyBorrowedByMe) {
-                        this.showToast('Anda sedang meminjam buku ini. Silakan baca di menu Pinjaman Aktif Anda.', 'error');
-                        return;
-                    }
-
-                    if (book.stock <= 0) {
-                        this.showToast('Buku tidak tersedia, silakan tunggu pengembalian buku atau baca buku yang lain.', 'error');
-                        return;
-                    }
-
-                    if (!this.currentUser || this.currentUser.role !== 'member') {
-                        this.showToast('Silakan daftar atau masuk terlebih dahulu untuk meminjam.', 'error');
-                        this.appState = 'register';
-                        window.scrollTo(0,0);
-                        return;
-                    }
-                    
-                    this.currentReadBook = book;
-                    const today = new Date();
-                    const due = new Date(today);
-                    due.setDate(due.getDate() + 7); 
-                    
-                    this.newLoan = {
-                        memberId: this.currentUser.id,
-                        bookId: book.id,
-                        borrowDate: today.toISOString().split('T')[0],
-                        dueDate: due.toISOString().split('T')[0]
-                    };
-                    this.showMemberLoanModal = true;
-                    this.$nextTick(() => lucide.createIcons());
+                addMember() {
+                    const newId = this.nextMemberId;
+                    const id = Date.now().toString();
+                    const photo = this.newMember.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(this.newMember.name) + '&background=0D8ABC&color=fff';
+                    window.fb.setDoc(this.getDoc('members', id), { ...this.newMember, id, memberId: newId, photo });
+                    this.showAddMemberModal = false;
+                    this.resetMemberForm();
+                    this.showToast('Anggota ditambahkan ke Cloud!');
+                },
+                updateMember() {
+                    window.fb.updateDoc(this.getDoc('members', this.editingMember.id.toString()), this.editingMember);
+                    this.showEditMemberModal = false; 
+                    this.showToast('Data anggota diperbarui!');
+                },
+                deleteMember(id) { 
+                    if(this.staffRole !== 'Admin') return this.showToast('Akses ditolak!', 'error');
+                    window.fb.deleteDoc(this.getDoc('members', id.toString()));
+                    this.showToast('Anggota dihapus permanen');
                 },
 
-                confirmMemberLoan() {
-                    const bookIndex = this.books.findIndex(b => b.id == this.newLoan.bookId);
-                    if(bookIndex !== -1 && this.books[bookIndex].stock > 0) {
-                        this.books[bookIndex].stock -= 1;
-                        this.loans.unshift({
-                            id: Date.now(),
-                            memberId: parseInt(this.newLoan.memberId),
-                            bookId: parseInt(this.newLoan.bookId),
-                            borrowDate: this.newLoan.borrowDate,
-                            dueDate: this.newLoan.dueDate,
-                            returnDate: null,
-                            status: 'Dipinjam'
-                        });
-                        this.showMemberLoanModal = false;
-                        this.newLoan = { memberId: '', bookId: '', borrowDate: '', dueDate: '' };
-                        this.showToast('Buku berhasil dipinjam!');
-                        this.memberTab = 'loans';
-                        this.$nextTick(() => lucide.createIcons());
-                    } else {
-                        this.showToast('Gagal! Stok buku kosong.', 'error');
-                    }
+                addCollection() {
+                    const id = Date.now().toString();
+                    window.fb.setDoc(this.getDoc('collections', id), { ...this.newCollection, id });
+                    this.showAddCollectionModal = false;
+                    this.newCollection = { type: 'Fisik', jenis: '', judul: '', jumlahJudul: 1, jumlahEksemplar: 1 };
+                    this.showToast('Koleksi ditambahkan ke Cloud!');
                 },
-
-                returnLoan(id) {
-                    const loanIndex = this.loans.findIndex(l => l.id === id);
-                    if(loanIndex !== -1 && this.loans[loanIndex].status === 'Dipinjam') {
-                        this.loans[loanIndex].status = 'Dikembalikan';
-                        this.loans[loanIndex].returnDate = new Date().toISOString().split('T')[0];
-                        const bookIndex = this.books.findIndex(b => b.id === this.loans[loanIndex].bookId);
-                        if(bookIndex !== -1) {
-                            this.books[bookIndex].stock += 1;
-                            this.books = [...this.books]; 
-                        }
-                        this.loans = [...this.loans]; 
-                        this.showToast('Buku berhasil dikembalikan!');
-                    }
+                updateCollection() {
+                    window.fb.updateDoc(this.getDoc('collections', this.editingCollection.id.toString()), this.editingCollection);
+                    this.showEditCollectionModal = false; 
+                    this.showToast('Inventaris diperbarui!');
+                },
+                deleteCollection(id) {
+                    if(this.staffRole !== 'Admin') return this.showToast('Akses ditolak!', 'error');
+                    window.fb.deleteDoc(this.getDoc('collections', id.toString()));
+                    this.showToast('Koleksi dihapus permanen');
                 },
 
                 saveJournal() {
                     if(!this.newJournal.title || !this.newJournal.summary) return;
-                    this.journals.unshift({ id: Date.now(), memberId: this.currentUser.id, ...this.newJournal });
-                    this.showToast('Jurnal membaca berhasil disimpan!');
+                    const id = Date.now().toString();
+                    window.fb.setDoc(this.getDoc('journals', id), {
+                        id, memberId: this.currentUser.id.toString(), ...this.newJournal
+                    });
+                    this.showToast('Jurnal membaca tersimpan ke Cloud!');
                     this.newJournal = { date: new Date().toISOString().split('T')[0], title: '', author: '', publisher: '', pages: '', summary: '' };
                 },
 
@@ -336,94 +377,168 @@
                     if (file) {
                         const reader = new FileReader();
                         reader.onload = (e) => {
-                            this.currentUser.photo = e.target.result;
-                            const index = this.members.findIndex(m => m.id === this.currentUser.id);
-                            if(index !== -1) { this.members[index].photo = e.target.result; }
-                            this.showToast('Foto profil berhasil diperbarui!');
+                            const img = new Image();
+                            img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                const MAX_WIDTH = 200; // Kecil khusus avatar
+                                let width = img.width; let height = img.height;
+                                if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                                canvas.width = width; canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0, width, height);
+                                
+                                const compressedData = canvas.toDataURL('image/jpeg', 0.8);
+                                this.currentUser.photo = compressedData;
+                                window.fb.updateDoc(this.getDoc('members', this.currentUser.id.toString()), { photo: compressedData });
+                                this.showToast('Foto profil berhasil diunggah!');
+                            };
+                            img.src = e.target.result;
                         };
                         reader.readAsDataURL(file);
                     }
                 },
 
-                // CRUD KOLEKSI (Digital & Fisik)
-                addCollection() {
-                    const id = Date.now();
-                    this.collections.unshift({ ...this.newCollection, id });
-                    this.showAddCollectionModal = false;
-                    this.newCollection = { type: 'Fisik', jenis: '', judul: '', jumlahJudul: 1, jumlahEksemplar: 1 };
-                    this.showToast('Koleksi berhasil ditambahkan!');
-                },
-                prepareEditCollection(col) {
-                    this.editingCollection = { ...col };
-                    this.showEditCollectionModal = true;
-                },
-                updateCollection() {
-                    const index = this.collections.findIndex(c => c.id === this.editingCollection.id);
-                    if (index !== -1) { 
-                        this.collections[index] = { ...this.editingCollection }; 
-                        this.showEditCollectionModal = false; 
-                        this.showToast('Koleksi diperbarui!'); 
+                // LOGIKA TRANSAKSI -------------------------------------
+                addLoan() {
+                    const bookId = this.newLoan.bookId.toString();
+                    const book = this.books.find(b => b.id.toString() === bookId);
+                    
+                    if(book && book.stock > 0) {
+                        const loanId = Date.now().toString();
+                        window.fb.setDoc(this.getDoc('loans', loanId), {
+                            id: loanId,
+                            memberId: this.newLoan.memberId.toString(),
+                            bookId: bookId,
+                            borrowDate: this.newLoan.borrowDate,
+                            dueDate: this.newLoan.dueDate,
+                            returnDate: null,
+                            status: 'Dipinjam'
+                        });
+                        window.fb.updateDoc(this.getDoc('books', bookId), { stock: book.stock - 1 });
+                        
+                        this.showAddLoanModal = false;
+                        this.newLoan = { memberId: '', bookId: '', borrowDate: '', dueDate: '' };
+                        this.showToast('Transaksi berhasil direkam ke Cloud!');
+                    } else {
+                        this.showToast('Gagal! Stok buku kosong.', 'error');
                     }
-                },
-                deleteCollection(id) {
-                    if(this.staffRole !== 'Admin') return this.showToast('Hanya Admin yang dapat menghapus data!', 'error');
-                    this.collections = this.collections.filter(c => c.id !== id);
-                    this.showToast('Koleksi berhasil dihapus', 'success');
                 },
 
-                // GETTERS AND COMPUTED 
-                get filteredBooks() {
-                    let result = this.books;
-                    if(this.searchQuery) {
-                        const q = this.searchQuery.toLowerCase();
-                        result = result.filter(b => b.title.toLowerCase().includes(q) || b.code.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
+                confirmMemberLoan() {
+                    const bookId = this.newLoan.bookId.toString();
+                    const book = this.books.find(b => b.id.toString() === bookId);
+                    
+                    if(book && book.stock > 0) {
+                        const loanId = Date.now().toString();
+                        window.fb.setDoc(this.getDoc('loans', loanId), {
+                            id: loanId,
+                            memberId: this.newLoan.memberId.toString(),
+                            bookId: bookId,
+                            borrowDate: this.newLoan.borrowDate,
+                            dueDate: this.newLoan.dueDate,
+                            returnDate: null,
+                            status: 'Dipinjam'
+                        });
+                        window.fb.updateDoc(this.getDoc('books', bookId), { stock: book.stock - 1 });
+                        
+                        this.showMemberLoanModal = false;
+                        this.newLoan = { memberId: '', bookId: '', borrowDate: '', dueDate: '' };
+                        this.showToast('Buku berhasil dipinjam!');
+                        this.memberTab = 'loans';
+                    } else {
+                        this.showToast('Gagal! Stok buku kosong.', 'error');
                     }
-                    return result;
                 },
-                get paginatedBooks() {
-                    const start = (this.currentPageBook - 1) * this.itemsPerPage;
-                    return this.filteredBooks.slice(start, start + this.itemsPerPage);
+
+                returnLoan(id) {
+                    const loan = this.loans.find(l => l.id.toString() === id.toString());
+                    if(loan && loan.status === 'Dipinjam') {
+                        const returnD = new Date().toISOString().split('T')[0];
+                        
+                        window.fb.updateDoc(this.getDoc('loans', loan.id.toString()), { 
+                            status: 'Dikembalikan', returnDate: returnD 
+                        });
+                        
+                        const book = this.books.find(b => b.id.toString() === loan.bookId.toString());
+                        if(book) {
+                            window.fb.updateDoc(this.getDoc('books', book.id.toString()), { stock: book.stock + 1 });
+                        }
+                        this.showToast('Buku selesai dikembalikan!');
+                    }
                 },
+
+                // FITUR UTILITIES & AUTH (Local)
+                goToLogin(role) {
+                    this.loginRole = role; this.appState = 'login';
+                    this.loginUsername = ''; this.loginPassword = ''; this.loginId = '';
+                    this.mobileMenuOpen = false; this.$nextTick(() => lucide.createIcons());
+                },
+
+                openFlipbook(book) {
+                    const isCurrentlyBorrowedByMe = this.currentUser && this.currentUser.role === 'member' && 
+                                                    this.loans.some(l => l.memberId.toString() === this.currentUser.id.toString() && l.bookId.toString() === book.id.toString() && l.status === 'Dipinjam');
+                    
+                    if (book.stock <= 0 && !isCurrentlyBorrowedByMe) return this.showToast('Buku sedang habis dipinjam orang lain.', 'error');
+                    if (!book || !book.link) return this.showToast('Link PDF buku ini belum diisi Admin.', 'error');
+                    
+                    this.currentReadBook = book;
+                    this.showFlipbookModal = true;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                requestLoan(book) {
+                    const isCurrentlyBorrowedByMe = this.currentUser && this.currentUser.role === 'member' && 
+                                                    this.loans.some(l => l.memberId.toString() === this.currentUser.id.toString() && l.bookId.toString() === book.id.toString() && l.status === 'Dipinjam');
+                    if (isCurrentlyBorrowedByMe) return this.showToast('Anda sudah meminjam buku ini. Cek tab Pinjaman.', 'error');
+                    if (book.stock <= 0) return this.showToast('Buku habis dipinjam.', 'error');
+                    if (!this.currentUser || this.currentUser.role !== 'member') {
+                        this.showToast('Silakan Masuk Anggota untuk meminjam.', 'error');
+                        this.appState = 'register'; window.scrollTo(0,0); return;
+                    }
+                    
+                    this.currentReadBook = book;
+                    const today = new Date(); const due = new Date(today); due.setDate(due.getDate() + 7); 
+                    
+                    this.newLoan = {
+                        memberId: this.currentUser.id.toString(), bookId: book.id.toString(),
+                        borrowDate: today.toISOString().split('T')[0], dueDate: due.toISOString().split('T')[0]
+                    };
+                    this.showMemberLoanModal = true;
+                },
+
+                // GETTERS (Pencarian & Relasi)
+                getMemberName(id) { const m = this.members.find(x => x.id.toString() === id.toString()); return m ? m.name : 'Anggota Terhapus'; },
+                getBookTitle(id) { const b = this.books.find(x => x.id.toString() === id.toString()); return b ? b.title : 'Buku Terhapus'; },
+
+                get filteredBooks() {
+                    let res = this.books;
+                    if(this.searchQuery) { const q = this.searchQuery.toLowerCase(); res = res.filter(b => b.title.toLowerCase().includes(q) || b.code.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)); }
+                    return res;
+                },
+                get paginatedBooks() { const start = (this.currentPageBook - 1) * this.itemsPerPage; return this.filteredBooks.slice(start, start + this.itemsPerPage); },
                 get totalPagesBook() { return Math.max(1, Math.ceil(this.filteredBooks.length / this.itemsPerPage)); },
 
                 get filteredCollections() {
-                    let result = this.collections;
-                    if(this.searchQuery) {
-                        const q = this.searchQuery.toLowerCase();
-                        result = result.filter(c => c.judul.toLowerCase().includes(q) || c.jenis.toLowerCase().includes(q));
-                    }
-                    return result;
+                    let res = this.collections;
+                    if(this.searchQuery) { const q = this.searchQuery.toLowerCase(); res = res.filter(c => c.judul.toLowerCase().includes(q) || c.jenis.toLowerCase().includes(q)); }
+                    return res;
                 },
-                get publicFilteredCollections() {
-                    return this.collections.filter(c => c.type === this.collectionTypeView);
-                },
+                get publicFilteredCollections() { return this.collections.filter(c => c.type === this.collectionTypeView); },
 
                 get filteredMembers() {
-                    let result = this.members;
-                    if(this.searchQuery) {
-                        const q = this.searchQuery.toLowerCase();
-                        result = result.filter(m => m.name.toLowerCase().includes(q) || m.memberId.toLowerCase().includes(q) || m.class.toLowerCase().includes(q));
-                    }
-                    return result;
+                    let res = this.members;
+                    if(this.searchQuery) { const q = this.searchQuery.toLowerCase(); res = res.filter(m => m.name.toLowerCase().includes(q) || m.memberId.toLowerCase().includes(q) || m.class.toLowerCase().includes(q)); }
+                    return res;
                 },
-                get paginatedMembers() {
-                    const start = (this.currentPageMember - 1) * this.itemsPerPage;
-                    return this.filteredMembers.slice(start, start + this.itemsPerPage);
-                },
+                get paginatedMembers() { const start = (this.currentPageMember - 1) * this.itemsPerPage; return this.filteredMembers.slice(start, start + this.itemsPerPage); },
                 get totalPagesMember() { return Math.max(1, Math.ceil(this.filteredMembers.length / this.itemsPerPage)); },
 
                 get filteredLoans() {
-                    let result = this.loans;
-                    if(this.searchQuery) {
-                        const q = this.searchQuery.toLowerCase();
-                        result = result.filter(l => this.getMemberName(l.memberId).toLowerCase().includes(q) || this.getBookTitle(l.bookId).toLowerCase().includes(q));
-                    }
-                    return result;
+                    let res = this.loans;
+                    if(this.searchQuery) { const q = this.searchQuery.toLowerCase(); res = res.filter(l => this.getMemberName(l.memberId).toLowerCase().includes(q) || this.getBookTitle(l.bookId).toLowerCase().includes(q)); }
+                    return res;
                 },
-                get paginatedLoans() {
-                    const start = (this.currentPageLoan - 1) * this.itemsPerPage;
-                    return this.filteredLoans.slice(start, start + this.itemsPerPage);
-                },
+                get paginatedLoans() { const start = (this.currentPageLoan - 1) * this.itemsPerPage; return this.filteredLoans.slice(start, start + this.itemsPerPage); },
                 get totalPagesLoan() { return Math.max(1, Math.ceil(this.filteredLoans.length / this.itemsPerPage)); },
 
                 get overdueLoans() {
@@ -432,179 +547,69 @@
                 },
                 get myLoans() {
                     if(!this.currentUser || this.currentUser.role !== 'member') return [];
-                    return this.loans.filter(l => l.memberId === this.currentUser.id);
+                    return this.loans.filter(l => l.memberId.toString() === this.currentUser.id.toString());
                 },
                 get myJournals() {
                     if(!this.currentUser || this.currentUser.role !== 'member') return [];
-                    return this.journals.filter(j => j.memberId === this.currentUser.id);
+                    return this.journals.filter(j => j.memberId.toString() === this.currentUser.id.toString());
                 },
 
-                // ADMIN CRUD LAINNYA
-                addBook() {
-                    const id = Date.now();
-                    const cover = this.newBook.cover || 'https://images.unsplash.com/photo-1543004218-ee141104308d?w=400';
-                    this.books.unshift({ ...this.newBook, id, cover });
-                    this.showAddBookModal = false;
-                    this.resetBookForm();
-                    this.showToast('Buku berhasil ditambahkan!');
-                    this.$nextTick(() => lucide.createIcons());
-                },
-                addMember() {
-                    const newId = this.nextMemberId;
-                    const id = Date.now();
-                    const photo = this.newMember.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(this.newMember.name) + '&background=0D8ABC&color=fff';
-                    this.members.unshift({ ...this.newMember, id, memberId: newId, photo });
-                    this.showAddMemberModal = false;
-                    this.resetMemberForm();
-                    this.showToast('Anggota berhasil ditambahkan!');
-                    this.$nextTick(() => lucide.createIcons());
-                },
-                addLoan() {
-                    const bookIndex = this.books.findIndex(b => b.id == this.newLoan.bookId);
-                    if(bookIndex !== -1 && this.books[bookIndex].stock > 0) {
-                        this.books[bookIndex].stock -= 1;
-                        this.loans.unshift({
-                            id: Date.now(),
-                            memberId: parseInt(this.newLoan.memberId),
-                            bookId: parseInt(this.newLoan.bookId),
-                            borrowDate: this.newLoan.borrowDate,
-                            dueDate: this.newLoan.dueDate,
-                            returnDate: null,
-                            status: 'Dipinjam'
-                        });
-                        this.showAddLoanModal = false;
-                        this.newLoan = { memberId: '', bookId: '', borrowDate: '', dueDate: '' };
-                        this.showToast('Transaksi berhasil ditambahkan!');
-                        this.$nextTick(() => lucide.createIcons());
-                    } else {
-                        this.showToast('Gagal! Stok buku kosong.', 'error');
-                    }
-                },
-                prepareEditBook(book) {
-                    this.editingBook = { ...book };
-                    this.showEditBookModal = true;
-                    this.$nextTick(() => lucide.createIcons());
-                },
-                updateBook() {
-                    const index = this.books.findIndex(b => b.id === this.editingBook.id);
-                    if (index !== -1) { this.books[index] = { ...this.editingBook }; this.showEditBookModal = false; this.showToast('Buku diperbarui!'); }
-                },
-                prepareEditMember(member) {
-                    this.editingMember = { ...member };
-                    this.showEditMemberModal = true;
-                    this.$nextTick(() => lucide.createIcons());
-                },
-                updateMember() {
-                    const index = this.members.findIndex(m => m.id === this.editingMember.id);
-                    if (index !== -1) { this.members[index] = { ...this.editingMember }; this.showEditMemberModal = false; this.showToast('Anggota diperbarui!'); }
-                },
-                deleteBook(id) { 
-                    if(this.staffRole !== 'Admin') return this.showToast('Hanya Admin yang dapat menghapus data!', 'error');
-                    this.books = this.books.filter(b => b.id !== id); 
-                    this.showToast('Buku berhasil dihapus', 'success');
-                },
-                deleteMember(id) { 
-                    if(this.staffRole !== 'Admin') return this.showToast('Hanya Admin yang dapat menghapus data!', 'error');
-                    this.members = this.members.filter(m => m.id !== id); 
-                    this.showToast('Anggota berhasil dihapus', 'success');
-                },
-
-                resetBookForm() { this.newBook = { title: '', author: '', code: '', category: 'Novel', stock: 1, cover: '', link: '' }; },
-                resetMemberForm() { this.newMember = { name: '', class: '', address: '', photo: '' }; },
-
-                getMemberName(id) { const m = this.members.find(x => x.id == id); return m ? m.name : 'Tidak Diketahui'; },
-                getBookTitle(id) { const b = this.books.find(x => x.id == id); return b ? b.title : 'Tidak Diketahui'; },
                 get filteredReportLoans() {
-                    let result = this.loans;
-                    if (this.reportConfig.type === 'pengembalian') result = result.filter(l => l.status === 'Dikembalikan');
-                    else if (this.reportConfig.type === 'peminjaman') result = result.filter(l => l.status === 'Dipinjam');
-                    if (this.reportConfig.startDate) result = result.filter(l => l.borrowDate >= this.reportConfig.startDate);
-                    if (this.reportConfig.endDate) result = result.filter(l => l.borrowDate <= this.reportConfig.endDate);
-                    return result;
+                    let res = this.loans;
+                    if (this.reportConfig.type === 'pengembalian') res = res.filter(l => l.status === 'Dikembalikan');
+                    else if (this.reportConfig.type === 'peminjaman') res = res.filter(l => l.status === 'Dipinjam');
+                    if (this.reportConfig.startDate) res = res.filter(l => l.borrowDate >= this.reportConfig.startDate);
+                    if (this.reportConfig.endDate) res = res.filter(l => l.borrowDate <= this.reportConfig.endDate);
+                    return res;
                 },
+
+                // EXPORT
                 exportToExcel() {
-                    let tables = document.querySelectorAll('#report-print-area table');
-                    let visibleTable = null;
+                    let tables = document.querySelectorAll('#report-print-area table'); let visibleTable = null;
                     tables.forEach(t => { if (t.offsetParent !== null) visibleTable = t; });
-                    if (!visibleTable) return this.showToast('Tidak ada data untuk diunduh', 'error');
-                    let csv = [];
-                    let rows = visibleTable.querySelectorAll('tr');
+                    if (!visibleTable) return this.showToast('Tidak ada data', 'error');
+                    let csv = []; let rows = visibleTable.querySelectorAll('tr');
                     for (let i = 0; i < rows.length; i++) {
                         let row = [], cols = rows[i].querySelectorAll('td, th');
                         for (let j = 0; j < cols.length; j++) {
                             let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/(\s\s)/gm, ' ').trim();
-                            data = data.replace(/"/g, '""');
-                            row.push('"' + data + '"');
+                            row.push('"' + data.replace(/"/g, '""') + '"');
                         }
                         csv.push(row.join(','));
                     }
                     let csvFile = new Blob([csv.join('\n')], {type: 'text/csv;charset=utf-8;'});
-                    let downloadLink = document.createElement('a');
-                    downloadLink.download = `Laporan_${this.reportConfig.type.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
-                    downloadLink.href = window.URL.createObjectURL(csvFile);
-                    downloadLink.style.display = 'none';
-                    document.body.appendChild(downloadLink);
-                    downloadLink.click();
-                    document.body.removeChild(downloadLink);
+                    let link = document.createElement('a');
+                    link.download = `Laporan_${this.reportConfig.type.toUpperCase()}.csv`;
+                    link.href = window.URL.createObjectURL(csvFile); link.style.display = 'none';
+                    document.body.appendChild(link); link.click(); document.body.removeChild(link);
                 },
                 exportToPDF() {
-                    const element = document.getElementById('report-print-area');
-                    const opt = {
-                        margin:       10,
-                        filename:     `Laporan_${this.reportConfig.type.toUpperCase()}_${new Date().toISOString().split('T')[0]}.pdf`,
-                        image:        { type: 'jpeg', quality: 0.98 },
-                        html2canvas:  { scale: 2 },
-                        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
-                    };
-                    html2pdf().set(opt).from(element).save();
+                    const el = document.getElementById('report-print-area');
+                    html2pdf().set({ margin: 10, filename: `Laporan_${this.reportConfig.type}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } }).from(el).save();
                 },
 
+                resetBookForm() { this.newBook = { title: '', author: '', code: '', category: 'Novel', stock: 1, cover: '', link: '' }; },
+                resetMemberForm() { this.newMember = { name: '', class: '', address: '', photo: '' }; },
                 getCurrentLabel() {
                     const allItems = [...this.adminMenuItems, {id:'loans', label:'Peminjaman'}, {id:'reports', label:'Laporan'}, {id:'settings', label:'Pengaturan Web'}];
                     const item = allItems.find(i => i.id === this.activeTab);
                     return item ? item.label : 'PerpusSmart';
                 },
-                
-                showMemberCard(member) {
-                    this.selectedMember = member;
-                    this.cardModal = true;
-                    this.$nextTick(() => lucide.createIcons());
-                },
+                showMemberCard(member) { this.selectedMember = member; this.cardModal = true; this.$nextTick(() => lucide.createIcons()); },
                 
                 renderChart() {
-                    const ctx = document.getElementById('loanChart');
-                    if (!ctx) return;
-                    
-                    let chartStatus = Chart.getChart("loanChart"); 
-                    if (chartStatus != undefined) { chartStatus.destroy(); }
-                    
+                    const ctx = document.getElementById('loanChart'); if (!ctx) return;
+                    let chartStatus = Chart.getChart("loanChart"); if (chartStatus != undefined) { chartStatus.destroy(); }
                     new Chart(ctx, {
                         type: 'line',
                         data: {
                             labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'],
                             datasets: [{
-                                label: 'Peminjaman',
-                                data: [12, 19, 15, 22, 30, 10],
-                                borderColor: '#2563eb',
-                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                                fill: true,
-                                tension: 0.4,
-                                borderWidth: 4,
-                                pointBackgroundColor: '#fff',
-                                pointBorderColor: '#2563eb',
-                                pointBorderWidth: 2,
-                                pointRadius: 5
+                                label: 'Peminjaman', data: [12, 19, 15, 22, 30, 10], borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                fill: true, tension: 0.4, borderWidth: 4, pointBackgroundColor: '#fff', pointBorderColor: '#2563eb', pointBorderWidth: 2, pointRadius: 5
                             }]
                         },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
-                            scales: {
-                                y: { grid: { borderDash: [5, 5] }, ticks: { font: { weight: 'bold' } } },
-                                x: { grid: { display: false }, ticks: { font: { weight: 'bold' } } }
-                            }
-                        }
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { borderDash: [5, 5] }, ticks: { font: { weight: 'bold' } } }, x: { grid: { display: false }, ticks: { font: { weight: 'bold' } } } } }
                     });
                 }
             }
@@ -621,6 +626,9 @@
         .bg-pattern { background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Animasi Ping Cloud */
+        .cloud-ping { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
     </style>
 </head>
 <body class="bg-[#f8fafc] font-sans text-slate-900 overflow-x-hidden relative" x-data="libraryApp()" x-cloak>
@@ -635,8 +643,10 @@
     <template x-if="appState === 'home' || appState === 'catalog' || appState === 'collections'">
         <header class="bg-white/90 backdrop-blur-xl border-b border-slate-200 fixed w-full top-0 z-50 px-4 md:px-6 h-20 flex items-center justify-between shadow-sm">
             <div class="flex items-center space-x-2 sm:space-x-3 cursor-pointer overflow-hidden" @click="appState = 'home'; mobileMenuOpen = false">
-                <div class="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30 flex-shrink-0">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30 flex-shrink-0 relative">
                     <i data-lucide="book-open" class="w-4 h-4 sm:w-6 sm:h-6"></i>
+                    <!-- Indikator Cloud -->
+                    <span x-show="isCloudConnected" class="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white cloud-ping" title="Terhubung ke Cloud Database"></span>
                 </div>
                 <h1 class="text-sm sm:text-xl font-black text-slate-800 truncate max-w-[140px] sm:max-w-md" x-text="siteSettings.libraryName"></h1>
             </div>
@@ -887,6 +897,10 @@
                     Masuk Sekarang
                 </button>
             </form>
+            
+            <div class="mt-6 text-center" x-show="loginRole === 'member'">
+                <button @click="appState = 'register'" class="text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors">Belum punya akun? <span class="underline">Daftar Anggota Baru</span></button>
+            </div>
         </div>
     </div>
 
@@ -1028,7 +1042,7 @@
                 <template x-for="loan in myLoans" :key="loan.id">
                     <div class="bg-white p-4 md:p-6 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col h-full">
                         <div class="flex items-start space-x-4 mb-4 md:mb-6">
-                            <img :src="books.find(b => b.id === loan.bookId)?.cover" class="w-16 h-24 md:w-20 md:h-28 object-cover rounded-xl shadow-sm bg-slate-100">
+                            <img :src="books.find(b => b.id.toString() === loan.bookId.toString())?.cover" class="w-16 h-24 md:w-20 md:h-28 object-cover rounded-xl shadow-sm bg-slate-100">
                             <div class="flex-1">
                                 <h4 class="font-black text-base md:text-lg text-slate-800 line-clamp-2" x-text="getBookTitle(loan.bookId)"></h4>
                                 <p class="text-[10px] md:text-xs font-bold text-slate-400 mt-1.5 md:mt-2">Tgl Pinjam: <span x-text="loan.borrowDate"></span></p>
@@ -1038,7 +1052,7 @@
                         </div>
                         
                         <div class="mt-auto grid grid-cols-2 gap-2 md:gap-3" x-show="loan.status === 'Dipinjam'">
-                            <button @click="openFlipbook(books.find(b => b.id === loan.bookId))" class="bg-blue-50 text-blue-600 font-black text-[10px] md:text-xs py-2.5 md:py-3 rounded-xl hover:bg-blue-600 hover:text-white transition-colors flex justify-center items-center"><i data-lucide="book-open" class="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5"></i> Baca Buku</button>
+                            <button @click="openFlipbook(books.find(b => b.id.toString() === loan.bookId.toString()))" class="bg-blue-50 text-blue-600 font-black text-[10px] md:text-xs py-2.5 md:py-3 rounded-xl hover:bg-blue-600 hover:text-white transition-colors flex justify-center items-center"><i data-lucide="book-open" class="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5"></i> Baca Buku</button>
                             <button @click="returnLoan(loan.id)" class="bg-rose-50 text-rose-600 font-black text-[10px] md:text-xs py-2.5 md:py-3 rounded-xl hover:bg-rose-500 hover:text-white transition-colors flex justify-center items-center"><i data-lucide="undo-2" class="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5"></i> Kembalikan</button>
                         </div>
                         <div class="mt-auto w-full" x-show="loan.status === 'Dikembalikan'">
@@ -1168,8 +1182,9 @@
                :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
             <div class="flex-1 flex flex-col px-4 md:px-6 py-6 md:py-8 overflow-y-auto">
                 <div class="flex items-center space-x-3 mb-8 md:mb-12 px-2">
-                    <div class="w-10 h-10 md:w-12 md:h-12 bg-blue-600 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200 flex-shrink-0">
+                    <div class="w-10 h-10 md:w-12 md:h-12 bg-blue-600 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200 flex-shrink-0 relative">
                         <i data-lucide="shield" class="w-5 h-5 md:w-6 md:h-6"></i>
+                        <span x-show="isCloudConnected" class="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white cloud-ping" title="Terhubung ke Cloud Database"></span>
                     </div>
                     <div class="overflow-hidden">
                         <h1 class="text-lg md:text-xl font-black tracking-tight text-slate-800">Staf<span class="text-blue-600">Panel</span></h1>
@@ -1272,14 +1287,14 @@
                                 <div class="p-3 md:p-4 bg-emerald-50 text-emerald-600 rounded-xl md:rounded-2xl"><i data-lucide="users"></i></div>
                             </div>
                             <h3 class="text-2xl md:text-4xl font-black text-slate-800" x-text="members.length"></h3>
-                            <span class="text-[10px] md:text-xs font-black text-slate-500 uppercase">Anggota</span>
+                            <span class="text-[10px] md:text-xs font-black text-slate-500 uppercase">Anggota Cloud</span>
                         </div>
                         <div class="bg-white p-5 md:p-8 rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm text-center md:text-left">
                             <div class="hidden md:flex justify-between items-start mb-6">
                                 <div class="p-3 md:p-4 bg-amber-50 text-amber-600 rounded-xl md:rounded-2xl"><i data-lucide="clock"></i></div>
                             </div>
                             <h3 class="text-2xl md:text-4xl font-black text-slate-800" x-text="loans.filter(l => l.status === 'Dipinjam').length"></h3>
-                            <span class="text-[10px] md:text-xs font-black text-slate-500 uppercase">Dipinjam</span>
+                            <span class="text-[10px] md:text-xs font-black text-slate-500 uppercase">Sedang Dipinjam</span>
                         </div>
                         <div class="bg-white p-5 md:p-8 rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm text-center md:text-left">
                             <div class="hidden md:flex justify-between items-start mb-6">
@@ -1488,6 +1503,7 @@
                         </div>
                     </div>
 
+                    <!-- PAGINATION LOANS -->
                     <div class="flex justify-between items-center bg-white p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shadow-sm" x-show="totalPagesLoan > 1">
                         <button @click="currentPageLoan--" :disabled="currentPageLoan === 1" class="px-3 md:px-4 py-1.5 md:py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs md:text-sm disabled:opacity-50">Prev</button>
                         <span class="text-xs md:text-sm font-black text-slate-500" x-text="currentPageLoan + ' / ' + totalPagesLoan"></span>
