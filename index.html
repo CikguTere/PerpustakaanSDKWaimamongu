@@ -1,0 +1,2056 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PerpusSmart Premium</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- HTML2PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script>
+        function libraryApp() {
+            return {
+                // APP STATE
+                appState: 'home',
+                mobileMenuOpen: false, // Untuk menu HP
+                showKoleksiDropdown: false, // Untuk Dropdown Koleksi Desktop
+                collectionTypeView: 'Digital', // 'Digital' atau 'Fisik' untuk halaman publik
+                
+                // TOAST NOTIFICATIONS
+                toast: { show: false, message: '', type: 'success' },
+                
+                // USER & AUTH STATE
+                loginRole: 'member',
+                loginUsername: '',
+                loginId: '',
+                loginPassword: '',
+                currentUser: null,
+                staffRole: '', 
+                
+                // VISITOR STATS
+                visitorCount: 0,
+                todayVisitorCount: 0,
+                hasFilledGuestbook: false,
+
+                // MEMBER PORTAL STATE
+                memberTab: 'dashboard', 
+
+                // SETTINGS
+                siteSettings: JSON.parse(localStorage.getItem('perpusSettings')) || {
+                    libraryName: 'Perpustakaan SD Katholik Waimamongu',
+                    welcomeMessage: 'Jelajahi Dunia Pengetahuan Melalui Koleksi Digital Kami.',
+                    waNumber: '6281234567890'
+                },
+
+                // ADMIN DASHBOARD STATE
+                activeTab: 'dashboard',
+                sidebarOpen: false,
+                searchQuery: '',
+                
+                // PAGINATION STATE
+                currentPageBook: 1,
+                currentPageMember: 1,
+                currentPageLoan: 1,
+                currentPageCollection: 1,
+                itemsPerPage: 8,
+                
+                // Modals & Viewers
+                showAddBookModal: false,
+                showEditBookModal: false,
+                showAddMemberModal: false,
+                showEditMemberModal: false,
+                cardModal: false,
+                showAddLoanModal: false, 
+                showMemberLoanModal: false, 
+                showFlipbookModal: false,
+                showGuestbookModal: false,
+                showAddCollectionModal: false,
+                showEditCollectionModal: false,
+                currentReadBook: null,
+
+                // Forms State
+                newBook: { title: '', author: '', code: '', category: 'Novel', stock: 1, cover: '', link: '' },
+                editingBook: { id: null, title: '', author: '', code: '', category: '', stock: 0, cover: '', link: '' },
+                
+                newMember: { name: '', class: '', address: '', photo: '' },
+                editingMember: { id: null, name: '', memberId: '', class: '', address: '', photo: '' },
+                
+                selectedMember: { name: '', photo: '', memberId: '', class: '' },
+                
+                newLoan: { memberId: '', bookId: '', borrowDate: '', dueDate: '' },
+                reportConfig: { type: 'buku', startDate: '', endDate: '' },
+
+                newJournal: { date: new Date().toISOString().split('T')[0], title: '', author: '', publisher: '', pages: '', summary: '' },
+                guestbookEntry: { date: new Date().toISOString().split('T')[0], name: '', institution: '', district: '', province: '', type: 'Umum' },
+                
+                // Form Koleksi Baru
+                newCollection: { type: 'Fisik', jenis: '', judul: '', jumlahJudul: 1, jumlahEksemplar: 1 },
+                editingCollection: { id: null, type: 'Fisik', jenis: '', judul: '', jumlahJudul: 1, jumlahEksemplar: 1 },
+
+                adminMenuItems: [
+                    { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
+                    { id: 'books', label: 'Data Buku', icon: 'book' },
+                    { id: 'members', label: 'Data Anggota', icon: 'users' },
+                    { id: 'collections', label: 'Inventaris Koleksi', icon: 'layers' } // Menu Baru
+                ],
+
+                // Initial Data
+                books: [
+                    { id: 1, code: 'B001', title: 'Laskar Pelangi', author: 'Andrea Hirata', category: 'Novel', stock: 5, cover: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400', link: 'https://mozilla.github.io/pdf.js/web/viewer.html?file=https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf' },
+                    { id: 2, code: 'B002', title: 'Bumi Manusia', author: 'Pramoedya Ananta Toer', category: 'Fiksi', stock: 3, cover: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=400', link: 'https://mozilla.github.io/pdf.js/web/viewer.html?file=https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf' },
+                    { id: 3, code: 'B003', title: 'Sapiens', author: 'Yuval Noah Harari', category: 'Sejarah', stock: 2, cover: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?w=400', link: 'https://mozilla.github.io/pdf.js/web/viewer.html?file=https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf' }
+                ],
+                collections: [
+                    { id: 1, type: 'Fisik', jenis: 'Buku Teks Pelajaran', judul: 'Matematika SD Kelas 6', jumlahJudul: 1, jumlahEksemplar: 35 },
+                    { id: 2, type: 'Digital', jenis: 'Modul Interaktif', judul: 'Panduan Belajar IPA Terpadu', jumlahJudul: 1, jumlahEksemplar: 100 }
+                ],
+                members: [
+                    { id: 1, memberId: 'M1001', name: 'Rizky Ramadhan', class: 'XII-IPA-1', address: 'Jl. Melati No. 12, Bandung', photo: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200' }
+                ],
+                loans: [],
+                journals: [],
+                
+                init() {
+                    this.$watch('activeTab', () => { this.searchQuery = ''; });
+                    this.$watch('memberTab', () => { this.searchQuery = ''; this.$nextTick(() => lucide.createIcons()); });
+                    this.$nextTick(() => { lucide.createIcons(); });
+                },
+
+                showToast(message, type = 'success') {
+                    this.toast.message = message;
+                    this.toast.type = type;
+                    this.toast.show = true;
+                    setTimeout(() => { this.toast.show = false; }, 3000);
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                get nextMemberId() {
+                    const lastIdNum = this.members.length > 0 ? parseInt(this.members[this.members.length - 1].memberId.replace('M', '')) : 1000;
+                    return 'M' + (lastIdNum + 1);
+                },
+
+                handleFileUpload(event, targetObject, propertyName) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            targetObject[propertyName] = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                },
+
+                saveSettings() {
+                    localStorage.setItem('perpusSettings', JSON.stringify(this.siteSettings));
+                    this.showToast('Pengaturan berhasil disimpan dan diperbarui!');
+                },
+
+                submitGuestbook() {
+                    if(!this.guestbookEntry.name || !this.guestbookEntry.institution || !this.guestbookEntry.district || !this.guestbookEntry.province) {
+                        this.showToast('Mohon lengkapi semua data buku tamu.', 'error');
+                        return;
+                    }
+                    this.visitorCount++;
+                    this.todayVisitorCount++;
+                    this.hasFilledGuestbook = true;
+                    this.showGuestbookModal = false;
+                    this.showToast('Terima kasih telah mengisi buku tamu! Silakan mulai membaca.');
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                goToLogin(role) {
+                    this.loginRole = role;
+                    this.appState = 'login';
+                    this.loginUsername = '';
+                    this.loginPassword = '';
+                    this.loginId = '';
+                    this.mobileMenuOpen = false;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                doLogin() {
+                    if (this.loginRole === 'admin') {
+                        if (this.loginUsername === 'admin' && this.loginPassword === 'admin123') {
+                            this.currentUser = { name: 'Super Admin', role: 'staff' };
+                            this.staffRole = 'Admin';
+                            this.appState = 'admin';
+                            this.$nextTick(() => { lucide.createIcons(); this.renderChart(); });
+                        } else if (this.loginUsername === 'petugas' && this.loginPassword === 'petugas123') {
+                            this.currentUser = { name: 'Petugas Perpus', role: 'staff' };
+                            this.staffRole = 'Petugas';
+                            this.appState = 'admin';
+                            this.$nextTick(() => { lucide.createIcons(); this.renderChart(); });
+                        } else {
+                            this.showToast('Username atau Kata sandi salah!', 'error');
+                        }
+                    } else {
+                        const member = this.members.find(m => m.memberId === this.loginId);
+                        if (member) {
+                            this.currentUser = { ...member, role: 'member' };
+                            this.memberTab = 'dashboard';
+                            this.appState = 'member';
+                            this.$nextTick(() => { lucide.createIcons(); });
+                        } else {
+                            this.showToast('Nomor Anggota tidak ditemukan!', 'error');
+                        }
+                    }
+                },
+
+                doLogout() {
+                    this.currentUser = null;
+                    this.staffRole = '';
+                    this.appState = 'home';
+                    this.activeTab = 'dashboard';
+                    this.memberTab = 'dashboard';
+                    this.hasFilledGuestbook = false; 
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                doRegister() {
+                    if(!this.newMember.name || !this.newMember.class) return;
+                    
+                    const newId = this.nextMemberId;
+                    const id = Date.now();
+                    const photo = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(this.newMember.name) + '&background=0D8ABC&color=fff';
+                    
+                    const newMemberObj = { ...this.newMember, id, memberId: newId, photo };
+                    this.members.push(newMemberObj);
+                    
+                    this.showToast(`Pendaftaran Berhasil! ID Anda: ${newId}`);
+                    this.resetMemberForm();
+                    
+                    this.currentUser = { ...newMemberObj, role: 'member' };
+                    this.visitorCount += 1;
+                    this.memberTab = 'dashboard';
+                    this.appState = 'member';
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                openFlipbook(book) {
+                    const isCurrentlyBorrowedByMe = this.currentUser && this.currentUser.role === 'member' && 
+                                                    this.loans.some(l => l.memberId === this.currentUser.id && l.bookId === book.id && l.status === 'Dipinjam');
+                    
+                    if (book.stock <= 0 && !isCurrentlyBorrowedByMe) {
+                        this.showToast('Buku tidak tersedia, silakan tunggu pengembalian buku atau baca buku yang lain.', 'error');
+                        return;
+                    }
+                    
+                    if (!book || !book.link) {
+                        this.showToast('Maaf, link bacaan untuk buku ini belum tersedia.', 'error');
+                        return;
+                    }
+                    this.currentReadBook = book;
+                    this.showFlipbookModal = true;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                requestLoan(book) {
+                    const isCurrentlyBorrowedByMe = this.currentUser && this.currentUser.role === 'member' && 
+                                                    this.loans.some(l => l.memberId === this.currentUser.id && l.bookId === book.id && l.status === 'Dipinjam');
+                    
+                    if (isCurrentlyBorrowedByMe) {
+                        this.showToast('Anda sedang meminjam buku ini. Silakan baca di menu Pinjaman Aktif Anda.', 'error');
+                        return;
+                    }
+
+                    if (book.stock <= 0) {
+                        this.showToast('Buku tidak tersedia, silakan tunggu pengembalian buku atau baca buku yang lain.', 'error');
+                        return;
+                    }
+
+                    if (!this.currentUser || this.currentUser.role !== 'member') {
+                        this.showToast('Silakan daftar atau masuk terlebih dahulu untuk meminjam.', 'error');
+                        this.appState = 'register';
+                        window.scrollTo(0,0);
+                        return;
+                    }
+                    
+                    this.currentReadBook = book;
+                    const today = new Date();
+                    const due = new Date(today);
+                    due.setDate(due.getDate() + 7); 
+                    
+                    this.newLoan = {
+                        memberId: this.currentUser.id,
+                        bookId: book.id,
+                        borrowDate: today.toISOString().split('T')[0],
+                        dueDate: due.toISOString().split('T')[0]
+                    };
+                    this.showMemberLoanModal = true;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                confirmMemberLoan() {
+                    const bookIndex = this.books.findIndex(b => b.id == this.newLoan.bookId);
+                    if(bookIndex !== -1 && this.books[bookIndex].stock > 0) {
+                        this.books[bookIndex].stock -= 1;
+                        this.loans.unshift({
+                            id: Date.now(),
+                            memberId: parseInt(this.newLoan.memberId),
+                            bookId: parseInt(this.newLoan.bookId),
+                            borrowDate: this.newLoan.borrowDate,
+                            dueDate: this.newLoan.dueDate,
+                            returnDate: null,
+                            status: 'Dipinjam'
+                        });
+                        this.showMemberLoanModal = false;
+                        this.newLoan = { memberId: '', bookId: '', borrowDate: '', dueDate: '' };
+                        this.showToast('Buku berhasil dipinjam!');
+                        this.memberTab = 'loans';
+                        this.$nextTick(() => lucide.createIcons());
+                    } else {
+                        this.showToast('Gagal! Stok buku kosong.', 'error');
+                    }
+                },
+
+                returnLoan(id) {
+                    const loanIndex = this.loans.findIndex(l => l.id === id);
+                    if(loanIndex !== -1 && this.loans[loanIndex].status === 'Dipinjam') {
+                        this.loans[loanIndex].status = 'Dikembalikan';
+                        this.loans[loanIndex].returnDate = new Date().toISOString().split('T')[0];
+                        const bookIndex = this.books.findIndex(b => b.id === this.loans[loanIndex].bookId);
+                        if(bookIndex !== -1) {
+                            this.books[bookIndex].stock += 1;
+                            this.books = [...this.books]; 
+                        }
+                        this.loans = [...this.loans]; 
+                        this.showToast('Buku berhasil dikembalikan!');
+                    }
+                },
+
+                saveJournal() {
+                    if(!this.newJournal.title || !this.newJournal.summary) return;
+                    this.journals.unshift({ id: Date.now(), memberId: this.currentUser.id, ...this.newJournal });
+                    this.showToast('Jurnal membaca berhasil disimpan!');
+                    this.newJournal = { date: new Date().toISOString().split('T')[0], title: '', author: '', publisher: '', pages: '', summary: '' };
+                },
+
+                updateMemberPhoto(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.currentUser.photo = e.target.result;
+                            const index = this.members.findIndex(m => m.id === this.currentUser.id);
+                            if(index !== -1) { this.members[index].photo = e.target.result; }
+                            this.showToast('Foto profil berhasil diperbarui!');
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                },
+
+                // CRUD KOLEKSI (Digital & Fisik)
+                addCollection() {
+                    const id = Date.now();
+                    this.collections.unshift({ ...this.newCollection, id });
+                    this.showAddCollectionModal = false;
+                    this.newCollection = { type: 'Fisik', jenis: '', judul: '', jumlahJudul: 1, jumlahEksemplar: 1 };
+                    this.showToast('Koleksi berhasil ditambahkan!');
+                },
+                prepareEditCollection(col) {
+                    this.editingCollection = { ...col };
+                    this.showEditCollectionModal = true;
+                },
+                updateCollection() {
+                    const index = this.collections.findIndex(c => c.id === this.editingCollection.id);
+                    if (index !== -1) { 
+                        this.collections[index] = { ...this.editingCollection }; 
+                        this.showEditCollectionModal = false; 
+                        this.showToast('Koleksi diperbarui!'); 
+                    }
+                },
+                deleteCollection(id) {
+                    if(this.staffRole !== 'Admin') return this.showToast('Hanya Admin yang dapat menghapus data!', 'error');
+                    this.collections = this.collections.filter(c => c.id !== id);
+                    this.showToast('Koleksi berhasil dihapus', 'success');
+                },
+
+                // GETTERS AND COMPUTED 
+                get filteredBooks() {
+                    let result = this.books;
+                    if(this.searchQuery) {
+                        const q = this.searchQuery.toLowerCase();
+                        result = result.filter(b => b.title.toLowerCase().includes(q) || b.code.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
+                    }
+                    return result;
+                },
+                get paginatedBooks() {
+                    const start = (this.currentPageBook - 1) * this.itemsPerPage;
+                    return this.filteredBooks.slice(start, start + this.itemsPerPage);
+                },
+                get totalPagesBook() { return Math.max(1, Math.ceil(this.filteredBooks.length / this.itemsPerPage)); },
+
+                get filteredCollections() {
+                    let result = this.collections;
+                    if(this.searchQuery) {
+                        const q = this.searchQuery.toLowerCase();
+                        result = result.filter(c => c.judul.toLowerCase().includes(q) || c.jenis.toLowerCase().includes(q));
+                    }
+                    return result;
+                },
+                get publicFilteredCollections() {
+                    return this.collections.filter(c => c.type === this.collectionTypeView);
+                },
+
+                get filteredMembers() {
+                    let result = this.members;
+                    if(this.searchQuery) {
+                        const q = this.searchQuery.toLowerCase();
+                        result = result.filter(m => m.name.toLowerCase().includes(q) || m.memberId.toLowerCase().includes(q) || m.class.toLowerCase().includes(q));
+                    }
+                    return result;
+                },
+                get paginatedMembers() {
+                    const start = (this.currentPageMember - 1) * this.itemsPerPage;
+                    return this.filteredMembers.slice(start, start + this.itemsPerPage);
+                },
+                get totalPagesMember() { return Math.max(1, Math.ceil(this.filteredMembers.length / this.itemsPerPage)); },
+
+                get filteredLoans() {
+                    let result = this.loans;
+                    if(this.searchQuery) {
+                        const q = this.searchQuery.toLowerCase();
+                        result = result.filter(l => this.getMemberName(l.memberId).toLowerCase().includes(q) || this.getBookTitle(l.bookId).toLowerCase().includes(q));
+                    }
+                    return result;
+                },
+                get paginatedLoans() {
+                    const start = (this.currentPageLoan - 1) * this.itemsPerPage;
+                    return this.filteredLoans.slice(start, start + this.itemsPerPage);
+                },
+                get totalPagesLoan() { return Math.max(1, Math.ceil(this.filteredLoans.length / this.itemsPerPage)); },
+
+                get overdueLoans() {
+                    const today = new Date().toISOString().split('T')[0];
+                    return this.loans.filter(l => l.status === 'Dipinjam' && l.dueDate < today);
+                },
+                get myLoans() {
+                    if(!this.currentUser || this.currentUser.role !== 'member') return [];
+                    return this.loans.filter(l => l.memberId === this.currentUser.id);
+                },
+                get myJournals() {
+                    if(!this.currentUser || this.currentUser.role !== 'member') return [];
+                    return this.journals.filter(j => j.memberId === this.currentUser.id);
+                },
+
+                // ADMIN CRUD LAINNYA
+                addBook() {
+                    const id = Date.now();
+                    const cover = this.newBook.cover || 'https://images.unsplash.com/photo-1543004218-ee141104308d?w=400';
+                    this.books.unshift({ ...this.newBook, id, cover });
+                    this.showAddBookModal = false;
+                    this.resetBookForm();
+                    this.showToast('Buku berhasil ditambahkan!');
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                addMember() {
+                    const newId = this.nextMemberId;
+                    const id = Date.now();
+                    const photo = this.newMember.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(this.newMember.name) + '&background=0D8ABC&color=fff';
+                    this.members.unshift({ ...this.newMember, id, memberId: newId, photo });
+                    this.showAddMemberModal = false;
+                    this.resetMemberForm();
+                    this.showToast('Anggota berhasil ditambahkan!');
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                addLoan() {
+                    const bookIndex = this.books.findIndex(b => b.id == this.newLoan.bookId);
+                    if(bookIndex !== -1 && this.books[bookIndex].stock > 0) {
+                        this.books[bookIndex].stock -= 1;
+                        this.loans.unshift({
+                            id: Date.now(),
+                            memberId: parseInt(this.newLoan.memberId),
+                            bookId: parseInt(this.newLoan.bookId),
+                            borrowDate: this.newLoan.borrowDate,
+                            dueDate: this.newLoan.dueDate,
+                            returnDate: null,
+                            status: 'Dipinjam'
+                        });
+                        this.showAddLoanModal = false;
+                        this.newLoan = { memberId: '', bookId: '', borrowDate: '', dueDate: '' };
+                        this.showToast('Transaksi berhasil ditambahkan!');
+                        this.$nextTick(() => lucide.createIcons());
+                    } else {
+                        this.showToast('Gagal! Stok buku kosong.', 'error');
+                    }
+                },
+                prepareEditBook(book) {
+                    this.editingBook = { ...book };
+                    this.showEditBookModal = true;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                updateBook() {
+                    const index = this.books.findIndex(b => b.id === this.editingBook.id);
+                    if (index !== -1) { this.books[index] = { ...this.editingBook }; this.showEditBookModal = false; this.showToast('Buku diperbarui!'); }
+                },
+                prepareEditMember(member) {
+                    this.editingMember = { ...member };
+                    this.showEditMemberModal = true;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                updateMember() {
+                    const index = this.members.findIndex(m => m.id === this.editingMember.id);
+                    if (index !== -1) { this.members[index] = { ...this.editingMember }; this.showEditMemberModal = false; this.showToast('Anggota diperbarui!'); }
+                },
+                deleteBook(id) { 
+                    if(this.staffRole !== 'Admin') return this.showToast('Hanya Admin yang dapat menghapus data!', 'error');
+                    this.books = this.books.filter(b => b.id !== id); 
+                    this.showToast('Buku berhasil dihapus', 'success');
+                },
+                deleteMember(id) { 
+                    if(this.staffRole !== 'Admin') return this.showToast('Hanya Admin yang dapat menghapus data!', 'error');
+                    this.members = this.members.filter(m => m.id !== id); 
+                    this.showToast('Anggota berhasil dihapus', 'success');
+                },
+
+                resetBookForm() { this.newBook = { title: '', author: '', code: '', category: 'Novel', stock: 1, cover: '', link: '' }; },
+                resetMemberForm() { this.newMember = { name: '', class: '', address: '', photo: '' }; },
+
+                getMemberName(id) { const m = this.members.find(x => x.id == id); return m ? m.name : 'Tidak Diketahui'; },
+                getBookTitle(id) { const b = this.books.find(x => x.id == id); return b ? b.title : 'Tidak Diketahui'; },
+                get filteredReportLoans() {
+                    let result = this.loans;
+                    if (this.reportConfig.type === 'pengembalian') result = result.filter(l => l.status === 'Dikembalikan');
+                    else if (this.reportConfig.type === 'peminjaman') result = result.filter(l => l.status === 'Dipinjam');
+                    if (this.reportConfig.startDate) result = result.filter(l => l.borrowDate >= this.reportConfig.startDate);
+                    if (this.reportConfig.endDate) result = result.filter(l => l.borrowDate <= this.reportConfig.endDate);
+                    return result;
+                },
+                exportToExcel() {
+                    let tables = document.querySelectorAll('#report-print-area table');
+                    let visibleTable = null;
+                    tables.forEach(t => { if (t.offsetParent !== null) visibleTable = t; });
+                    if (!visibleTable) return this.showToast('Tidak ada data untuk diunduh', 'error');
+                    let csv = [];
+                    let rows = visibleTable.querySelectorAll('tr');
+                    for (let i = 0; i < rows.length; i++) {
+                        let row = [], cols = rows[i].querySelectorAll('td, th');
+                        for (let j = 0; j < cols.length; j++) {
+                            let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/(\s\s)/gm, ' ').trim();
+                            data = data.replace(/"/g, '""');
+                            row.push('"' + data + '"');
+                        }
+                        csv.push(row.join(','));
+                    }
+                    let csvFile = new Blob([csv.join('\n')], {type: 'text/csv;charset=utf-8;'});
+                    let downloadLink = document.createElement('a');
+                    downloadLink.download = `Laporan_${this.reportConfig.type.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+                    downloadLink.href = window.URL.createObjectURL(csvFile);
+                    downloadLink.style.display = 'none';
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                },
+                exportToPDF() {
+                    const element = document.getElementById('report-print-area');
+                    const opt = {
+                        margin:       10,
+                        filename:     `Laporan_${this.reportConfig.type.toUpperCase()}_${new Date().toISOString().split('T')[0]}.pdf`,
+                        image:        { type: 'jpeg', quality: 0.98 },
+                        html2canvas:  { scale: 2 },
+                        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+                    };
+                    html2pdf().set(opt).from(element).save();
+                },
+
+                getCurrentLabel() {
+                    const allItems = [...this.adminMenuItems, {id:'loans', label:'Peminjaman'}, {id:'reports', label:'Laporan'}, {id:'settings', label:'Pengaturan Web'}];
+                    const item = allItems.find(i => i.id === this.activeTab);
+                    return item ? item.label : 'PerpusSmart';
+                },
+                
+                showMemberCard(member) {
+                    this.selectedMember = member;
+                    this.cardModal = true;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                
+                renderChart() {
+                    const ctx = document.getElementById('loanChart');
+                    if (!ctx) return;
+                    
+                    let chartStatus = Chart.getChart("loanChart"); 
+                    if (chartStatus != undefined) { chartStatus.destroy(); }
+                    
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'],
+                            datasets: [{
+                                label: 'Peminjaman',
+                                data: [12, 19, 15, 22, 30, 10],
+                                borderColor: '#2563eb',
+                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                fill: true,
+                                tension: 0.4,
+                                borderWidth: 4,
+                                pointBackgroundColor: '#fff',
+                                pointBorderColor: '#2563eb',
+                                pointBorderWidth: 2,
+                                pointRadius: 5
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: { grid: { borderDash: [5, 5] }, ticks: { font: { weight: 'bold' } } },
+                                x: { grid: { display: false }, ticks: { font: { weight: 'bold' } } }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
+        .sidebar-item-active { background-color: #2563eb; color: white; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3); }
+        input:focus, select:focus, textarea:focus { border-color: #2563eb !important; outline: none !important; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1) !important; }
+        .bg-pattern { background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-[#f8fafc] font-sans text-slate-900 overflow-x-hidden relative" x-data="libraryApp()" x-cloak>
+
+    <!-- TOAST NOTIFICATION UTAMA -->
+    <div x-show="toast.show" x-transition.opacity.duration.300ms class="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] flex items-center px-6 py-4 rounded-2xl shadow-2xl" :class="toast.type === 'error' ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'" x-cloak>
+        <i :data-lucide="toast.type === 'error' ? 'alert-circle' : 'check-circle'" class="w-6 h-6 mr-3"></i>
+        <span class="font-black text-sm" x-text="toast.message"></span>
+    </div>
+
+    <!-- KOMPONEN HEADER PUBLIK (Dengan Hamburger Menu & Dropdown Koleksi) -->
+    <template x-if="appState === 'home' || appState === 'catalog' || appState === 'collections'">
+        <header class="bg-white/90 backdrop-blur-xl border-b border-slate-200 fixed w-full top-0 z-50 px-4 md:px-6 h-20 flex items-center justify-between shadow-sm">
+            <div class="flex items-center space-x-2 sm:space-x-3 cursor-pointer overflow-hidden" @click="appState = 'home'; mobileMenuOpen = false">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30 flex-shrink-0">
+                    <i data-lucide="book-open" class="w-4 h-4 sm:w-6 sm:h-6"></i>
+                </div>
+                <h1 class="text-sm sm:text-xl font-black text-slate-800 truncate max-w-[140px] sm:max-w-md" x-text="siteSettings.libraryName"></h1>
+            </div>
+            
+            <!-- Menu Desktop -->
+            <div class="hidden lg:flex items-center space-x-8">
+                <a href="#" @click.prevent="appState = 'home'" class="text-sm font-bold transition-colors" :class="appState === 'home' ? 'text-blue-600 font-black' : 'text-slate-500 hover:text-slate-800'">Beranda</a>
+                <a href="#" @click.prevent="appState = 'catalog'" class="text-sm font-bold transition-colors" :class="appState === 'catalog' ? 'text-blue-600 font-black' : 'text-slate-500 hover:text-slate-800'">Katalog Buku</a>
+                
+                <!-- Dropdown Koleksi -->
+                <div class="relative">
+                    <button @click="showKoleksiDropdown = !showKoleksiDropdown" @click.away="showKoleksiDropdown = false" class="flex items-center space-x-1 text-sm font-bold transition-colors" :class="appState === 'collections' ? 'text-blue-600 font-black' : 'text-slate-500 hover:text-slate-800'">
+                        <span>Koleksi</span>
+                        <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                    </button>
+                    <div x-show="showKoleksiDropdown" x-transition.opacity class="absolute top-full mt-4 left-1/2 -translate-x-1/2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50">
+                        <a href="#" @click.prevent="appState = 'collections'; collectionTypeView = 'Digital'; showKoleksiDropdown = false" class="block px-5 py-3 text-sm font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors">Koleksi Digital</a>
+                        <a href="#" @click.prevent="appState = 'collections'; collectionTypeView = 'Fisik'; showKoleksiDropdown = false" class="block px-5 py-3 text-sm font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors">Koleksi Fisik</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tombol Kanan & Hamburger -->
+            <div class="flex items-center space-x-2">
+                <button @click="goToLogin('member')" class="hidden sm:block bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-black hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition-all hover:-translate-y-0.5">Masuk</button>
+                <button @click="goToLogin('admin')" class="hidden sm:flex bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-black hover:bg-slate-800 shadow-lg transition-all hover:-translate-y-0.5 items-center space-x-2">
+                    <i data-lucide="shield" class="w-4 h-4"></i><span>Staf</span>
+                </button>
+                <!-- Hamburger Button -->
+                <button @click="mobileMenuOpen = !mobileMenuOpen" class="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
+            </div>
+            
+            <!-- Mobile Menu Dropdown -->
+            <div x-show="mobileMenuOpen" @click.away="mobileMenuOpen = false" x-transition class="absolute top-20 left-0 w-full bg-white border-b border-slate-200 shadow-lg lg:hidden flex flex-col py-4 px-6 space-y-4">
+                <a href="#" @click.prevent="appState = 'home'; mobileMenuOpen = false" class="text-base font-black text-slate-700 border-b border-slate-100 pb-2">Beranda</a>
+                <a href="#" @click.prevent="appState = 'catalog'; mobileMenuOpen = false" class="text-base font-black text-slate-700 border-b border-slate-100 pb-2">Katalog Buku</a>
+                <a href="#" @click.prevent="appState = 'collections'; collectionTypeView = 'Digital'; mobileMenuOpen = false" class="text-base font-black text-blue-600 border-b border-slate-100 pb-2">Koleksi Digital</a>
+                <a href="#" @click.prevent="appState = 'collections'; collectionTypeView = 'Fisik'; mobileMenuOpen = false" class="text-base font-black text-blue-600 border-b border-slate-100 pb-2">Koleksi Fisik</a>
+                <div class="pt-2 flex space-x-3">
+                    <button @click="goToLogin('member')" class="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-black shadow-lg shadow-blue-500/30">Masuk Anggota</button>
+                    <button @click="goToLogin('admin')" class="flex-1 bg-slate-900 text-white py-3 rounded-xl text-sm font-black shadow-lg">Masuk Staf</button>
+                </div>
+            </div>
+        </header>
+    </template>
+
+    <!-- ========================================== -->
+    <!-- VIEW 0: PUBLIC HOME PAGE                   -->
+    <!-- ========================================== -->
+    <div x-show="appState === 'home'" class="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden pt-20">
+        <div class="pt-8 md:pt-12 pb-20 px-4 md:px-6 flex-1 flex items-center bg-pattern relative">
+            <div class="absolute inset-0 bg-gradient-to-b from-blue-50/80 to-slate-50"></div>
+            <div class="max-w-7xl mx-auto w-full relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center">
+                <div class="text-center lg:text-left pt-4">
+                    <span class="bg-blue-100 text-blue-600 px-3 py-1 md:px-4 md:py-1.5 rounded-full text-[10px] md:text-xs font-black uppercase tracking-widest mb-4 inline-block">Portal Digital Publik</span>
+                    <h2 class="text-3xl sm:text-4xl md:text-6xl font-black text-slate-800 leading-tight mb-4 md:mb-6">
+                        Selamat Datang di <br>
+                        <span class="text-blue-600" x-text="siteSettings.libraryName"></span>
+                    </h2>
+                    <p class="text-sm md:text-lg font-bold text-slate-500 mb-8 max-w-xl mx-auto lg:mx-0 px-4 md:px-0" x-text="siteSettings.welcomeMessage"></p>
+                    
+                    <div class="flex flex-col sm:flex-row justify-center lg:justify-start items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full px-6 md:px-0">
+                        <button x-show="!hasFilledGuestbook" @click="showGuestbookModal = true" class="w-full sm:w-auto bg-blue-600 text-white px-8 py-4 rounded-xl md:rounded-2xl font-black shadow-xl shadow-blue-500/30 hover:bg-blue-700 transition-all text-sm md:text-lg hover:-translate-y-1">
+                            Buku Tamu
+                        </button>
+                        
+                        <button x-show="hasFilledGuestbook" @click="appState = 'catalog'" class="w-full sm:w-auto bg-emerald-600 text-white px-8 py-4 rounded-xl md:rounded-2xl font-black shadow-xl shadow-emerald-500/30 hover:bg-emerald-700 transition-all text-sm md:text-lg hover:-translate-y-1">
+                            Mulai Membaca
+                        </button>
+                    </div>
+
+                    <div class="mt-8 md:mt-12 flex flex-row items-center justify-center lg:justify-start space-x-6 md:space-x-8 border-t border-slate-200/50 pt-6 md:pt-8">
+                        <div>
+                            <p class="text-3xl md:text-4xl font-black text-blue-600 drop-shadow-sm" x-text="todayVisitorCount"></p>
+                            <p class="text-[9px] md:text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Pengunjung Hari Ini</p>
+                        </div>
+                        <div class="h-8 md:h-10 w-px bg-slate-200"></div>
+                        <div>
+                            <p class="text-3xl md:text-4xl font-black text-emerald-600 drop-shadow-sm" x-text="visitorCount.toLocaleString()"></p>
+                            <p class="text-[9px] md:text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Total Kunjungan</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="hidden lg:block relative">
+                    <div class="absolute inset-0 bg-blue-500/20 rounded-full blur-3xl"></div>
+                    <img src="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=800" class="rounded-[40px] shadow-2xl relative z-10 border-8 border-white transform rotate-2 hover:rotate-0 transition-transform duration-500 object-cover aspect-square">
+                </div>
+            </div>
+        </div>
+        
+        <footer class="bg-white border-t border-slate-200 py-6 md:py-8 relative z-10">
+            <div class="max-w-7xl mx-auto px-4 md:px-6 flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6 text-center md:text-left">
+                <p class="text-xs md:text-sm font-bold text-slate-400">&copy; 2026 <span x-text="siteSettings.libraryName"></span>.<br class="md:hidden"> Hak Cipta Dilindungi.</p>
+                <a :href="'https://wa.me/' + siteSettings.waNumber" target="_blank" class="flex items-center space-x-2 bg-[#25D366] text-white px-4 md:px-6 py-3 rounded-xl md:rounded-2xl font-black hover:bg-[#1ebd5a] transition-all shadow-lg shadow-green-500/30 hover:-translate-y-1 text-sm">
+                    <svg class="w-4 h-4 md:w-5 md:h-5" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+                    <span>Hubungi Kami</span>
+                </a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VIEW 0.5: PUBLIC CATALOG (TANPA LOGIN)     -->
+    <!-- ========================================== -->
+    <div x-show="appState === 'catalog'" class="min-h-screen bg-slate-50 flex flex-col relative pt-20 pb-20">
+        <div class="max-w-7xl mx-auto px-4 md:px-6 w-full pt-6 md:pt-10">
+            <div class="flex flex-col md:flex-row items-center justify-between mb-8 md:mb-10 gap-4">
+                <div class="text-center md:text-left">
+                    <h2 class="text-2xl md:text-4xl font-black text-slate-800">Katalog Buku</h2>
+                    <p class="text-xs md:text-base text-slate-500 font-bold mt-1 md:mt-2">Jelajahi semua koleksi perpustakaan secara bebas.</p>
+                </div>
+                <div class="relative w-full md:w-72">
+                    <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 md:w-5 md:h-5"></i>
+                    <input type="text" x-model="searchQuery" placeholder="Cari judul, pengarang..." class="w-full pl-10 md:pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold shadow-sm">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+                <template x-for="book in filteredBooks" :key="book.id">
+                    <div class="bg-white p-3 md:p-4 rounded-2xl md:rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all group relative flex flex-col h-full cursor-pointer" @click="requestLoan(book)">
+                        <div class="relative overflow-hidden rounded-xl md:rounded-2xl aspect-[2/3] mb-3 md:mb-4 bg-slate-100">
+                            <img :src="book.cover" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                            <div class="absolute top-2 right-2 md:top-3 md:right-3 bg-white/90 backdrop-blur-sm px-2 py-0.5 md:px-2.5 md:py-1 rounded-md md:rounded-lg">
+                                <span class="text-[8px] md:text-[10px] font-black" :class="book.stock > 0 ? 'text-emerald-600' : 'text-rose-600'" x-text="book.stock > 0 ? 'Tersedia' : 'Kosong'"></span>
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <span class="text-[8px] md:text-[10px] font-black text-blue-500 uppercase tracking-widest" x-text="book.category"></span>
+                            <h4 class="font-black text-slate-800 mt-1 line-clamp-1 text-sm md:text-lg" x-text="book.title"></h4>
+                            <p class="text-[10px] md:text-xs font-bold text-slate-400 mt-0.5 md:mt-1 truncate" x-text="book.author"></p>
+                        </div>
+                        <div class="mt-3 md:mt-4 grid grid-cols-2 gap-2">
+                            <button @click.stop="openFlipbook(book)" class="w-full bg-blue-50 text-blue-600 font-black text-[10px] md:text-xs py-2 rounded-lg md:rounded-xl hover:bg-blue-600 hover:text-white transition-colors flex justify-center items-center"><i data-lucide="book-open" class="w-3 h-3 md:w-4 md:h-4 mr-1"></i> Baca</button>
+                            <button @click.stop="requestLoan(book)" class="w-full bg-amber-50 text-amber-600 font-black text-[10px] md:text-xs py-2 rounded-lg md:rounded-xl hover:bg-amber-500 hover:text-white transition-colors flex justify-center items-center"><i data-lucide="bookmark-plus" class="w-3 h-3 md:w-4 md:h-4 mr-1"></i> Pinjam</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            
+            <div x-show="filteredBooks.length === 0" class="text-center py-20">
+                <i data-lucide="search-X" class="w-12 h-12 text-slate-300 mx-auto mb-4"></i>
+                <p class="text-sm md:text-base text-slate-500 font-bold">Buku tidak ditemukan.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VIEW 0.6: PUBLIC COLLECTIONS (INVENTARIS)  -->
+    <!-- ========================================== -->
+    <div x-show="appState === 'collections'" class="min-h-screen bg-slate-50 flex flex-col relative pt-20 pb-20">
+        <div class="max-w-7xl mx-auto px-4 md:px-6 w-full pt-6 md:pt-10">
+            <div class="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+                <div class="text-center md:text-left">
+                    <span class="text-[10px] md:text-xs font-black text-blue-600 bg-blue-100 px-3 py-1 rounded-lg uppercase tracking-widest mb-2 inline-block">Data Inventaris</span>
+                    <h2 class="text-2xl md:text-4xl font-black text-slate-800">Koleksi <span x-text="collectionTypeView"></span></h2>
+                    <p class="text-xs md:text-base text-slate-500 font-bold mt-1 md:mt-2">Ringkasan inventaris koleksi <span class="lowercase" x-text="collectionTypeView"></span> perpustakaan kami.</p>
+                </div>
+                <div class="relative w-full md:w-72">
+                    <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 md:w-5 md:h-5"></i>
+                    <input type="text" x-model="searchQuery" placeholder="Cari jenis, judul..." class="w-full pl-10 md:pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold shadow-sm">
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm overflow-hidden w-full animate-in fade-in duration-300">
+                <div class="overflow-x-auto w-full">
+                    <table class="w-full text-left min-w-[600px]">
+                        <thead class="bg-slate-50 text-slate-400 text-[10px] md:text-xs uppercase font-black tracking-widest border-b border-slate-100">
+                            <tr>
+                                <th class="p-4 md:p-6 pl-4 md:pl-8">Jenis Buku</th>
+                                <th class="p-4 md:p-6">Judul Buku / Keterangan</th>
+                                <th class="p-4 md:p-6 text-center">Jml Judul</th>
+                                <th class="p-4 md:p-6 pr-4 md:pr-8 text-center">Jml Eksemplar</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            <template x-for="col in publicFilteredCollections" :key="col.id">
+                                <!-- Filter dengan Pencarian -->
+                                <tr class="hover:bg-slate-50/50 transition-colors" x-show="!searchQuery || col.jenis.toLowerCase().includes(searchQuery.toLowerCase()) || col.judul.toLowerCase().includes(searchQuery.toLowerCase())">
+                                    <td class="p-4 md:p-6 pl-4 md:pl-8 font-black text-slate-800 text-sm md:text-base" x-text="col.jenis"></td>
+                                    <td class="p-4 md:p-6 font-bold text-slate-600 text-xs md:text-sm" x-text="col.judul"></td>
+                                    <td class="p-4 md:p-6 text-center font-black text-blue-600 text-base md:text-lg" x-text="col.jumlahJudul"></td>
+                                    <td class="p-4 md:p-6 pr-4 md:pr-8 text-center font-black text-emerald-600 text-base md:text-lg" x-text="col.jumlahEksemplar"></td>
+                                </tr>
+                            </template>
+                            <tr x-show="publicFilteredCollections.length === 0">
+                                <td colspan="4" class="p-6 md:p-8 text-center text-slate-400 font-bold italic text-sm">Tidak ada data koleksi <span x-text="collectionTypeView"></span> yang tercatat.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VIEW 1: LOGIN & PORTAL AUTHENTICATION      -->
+    <!-- ========================================== -->
+    <div x-show="appState === 'login'" class="min-h-screen flex items-center justify-center bg-slate-900 bg-pattern relative overflow-hidden p-4 md:p-6">
+        <div class="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-blue-900/50 to-slate-900/80"></div>
+        
+        <div class="bg-white p-6 md:p-10 rounded-[24px] md:rounded-[40px] shadow-2xl w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">
+            <button @click="appState = 'home'" class="absolute top-4 left-4 p-2 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors">
+                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+            </button>
+            
+            <div class="text-center mb-6 mt-4">
+                <div class="w-12 h-12 md:w-16 md:h-16 bg-blue-600 rounded-xl md:rounded-2xl flex items-center justify-center text-white mx-auto shadow-lg shadow-blue-500/30 mb-4">
+                    <i data-lucide="book-open" class="w-6 h-6 md:w-8 md:h-8"></i>
+                </div>
+                <h2 class="text-xl md:text-2xl font-black text-slate-800" x-text="siteSettings.libraryName"></h2>
+                <p class="text-xs md:text-sm font-bold text-slate-400 mt-1">Sistem Informasi Perpustakaan</p>
+            </div>
+
+            <div class="flex p-1 bg-slate-100 rounded-xl md:rounded-2xl mb-6">
+                <button @click="loginRole = 'member'" class="flex-1 py-2 md:py-3 text-xs md:text-sm font-black rounded-lg md:rounded-xl transition-all" :class="loginRole === 'member' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'">Anggota</button>
+                <button @click="loginRole = 'admin'" class="flex-1 py-2 md:py-3 text-xs md:text-sm font-black rounded-lg md:rounded-xl transition-all" :class="loginRole === 'admin' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'">Staf / Admin</button>
+            </div>
+
+            <form @submit.prevent="doLogin" class="space-y-4">
+                <div x-show="loginRole === 'member'" class="space-y-2">
+                    <label class="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest">Nomor Anggota</label>
+                    <div class="relative">
+                        <i data-lucide="user" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 md:w-5 md:h-5"></i>
+                        <input x-model="loginId" type="text" class="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl font-bold text-sm" placeholder="ID (M1001)" :required="loginRole === 'member'">
+                    </div>
+                </div>
+
+                <div x-show="loginRole === 'admin'" class="space-y-4">
+                    <div class="space-y-2">
+                        <label class="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest">Username</label>
+                        <div class="relative">
+                            <i data-lucide="user" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 md:w-5 md:h-5"></i>
+                            <input x-model="loginUsername" type="text" class="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl font-bold text-sm" placeholder="admin / petugas" :required="loginRole === 'admin'">
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest">Kata Sandi</label>
+                        <div class="relative">
+                            <i data-lucide="lock" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 md:w-5 md:h-5"></i>
+                            <input x-model="loginPassword" type="password" class="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl font-bold text-sm" placeholder="Masukkan Kata Sandi" :required="loginRole === 'admin'">
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full py-3 md:py-4 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black shadow-xl shadow-blue-500/30 hover:bg-blue-700 transition-all text-sm md:text-base">
+                    Masuk Sekarang
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VIEW 2: REGISTER ANGGOTA BARU              -->
+    <!-- ========================================== -->
+    <div x-show="appState === 'register'" class="min-h-screen flex items-center justify-center bg-slate-50 relative overflow-hidden p-6">
+        <div class="bg-white p-10 rounded-[40px] shadow-2xl w-full max-w-lg border border-slate-100 animate-in slide-in-from-right duration-500">
+            <button @click="appState = 'home'" class="mb-6 flex items-center space-x-2 text-slate-400 hover:text-slate-800 font-bold text-sm transition-colors">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i> <span>Kembali ke Beranda</span>
+            </button>
+            
+            <h2 class="text-3xl font-black text-slate-800 tracking-tight mb-2">Daftar Anggota</h2>
+            <p class="text-slate-400 font-bold mb-8">Bergabunglah dan akses ratusan koleksi buku digital kami.</p>
+
+            <form @submit.prevent="doRegister" class="space-y-5">
+                <div class="space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Nomor Anggota (Otomatis)</label>
+                    <input type="text" :value="nextMemberId" readonly class="w-full p-3 sm:p-4 bg-slate-100 text-slate-400 border-none rounded-xl sm:rounded-2xl font-black text-sm cursor-not-allowed text-center tracking-widest">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Nama Lengkap *</label>
+                    <input x-model="newMember.name" type="text" class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold" required placeholder="Contoh: Budi Santoso">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kelas / Jabatan *</label>
+                    <input x-model="newMember.class" type="text" class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold" required placeholder="Contoh: X-IPA-1 / Guru">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Alamat Domisili</label>
+                    <textarea x-model="newMember.address" class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold h-24" placeholder="Alamat lengkap..."></textarea>
+                </div>
+                <button type="submit" class="w-full py-4 bg-emerald-600 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-emerald-500/30 hover:bg-emerald-700 transition-all mt-4">
+                    Daftar Sekarang
+                </button>
+            </form>
+            
+            <div class="mt-6 text-center">
+                <button @click="goToLogin('member')" class="text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors">Sudah punya Nomor Anggota? <span class="underline">Masuk di sini</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VIEW 3: PORTAL ANGGOTA (PREMIUM)           -->
+    <!-- ========================================== -->
+    <div x-show="appState === 'member'" class="min-h-screen bg-slate-50 pb-20 flex flex-col">
+        <header class="bg-white/80 backdrop-blur-xl border-b border-slate-200 sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 md:px-6 h-16 md:h-20 flex items-center justify-between">
+                <div class="flex items-center space-x-2 md:space-x-3">
+                    <div class="w-8 h-8 md:w-10 md:h-10 bg-blue-600 rounded-lg md:rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+                        <i data-lucide="library" class="w-4 h-4 md:w-6 md:h-6"></i>
+                    </div>
+                    <h1 class="text-sm md:text-xl font-black text-slate-800 hidden sm:block truncate max-w-sm" x-text="siteSettings.libraryName"></h1>
+                </div>
+                <div class="flex items-center space-x-3 md:space-x-6">
+                    <div class="hidden lg:flex items-center space-x-4 bg-slate-100 px-4 py-2 rounded-2xl">
+                        <i data-lucide="bar-chart-2" class="w-4 h-4 text-slate-400"></i>
+                        <span class="text-xs font-bold text-slate-500">Total Pengunjung: <strong class="text-blue-600 text-sm" x-text="visitorCount.toLocaleString()"></strong></span>
+                    </div>
+                    <div class="flex items-center space-x-2 md:space-x-3 bg-white p-1 rounded-full shadow-sm border border-slate-100">
+                        <img :src="currentUser?.photo" class="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-slate-200 object-cover">
+                        <div class="text-right hidden sm:block pr-2">
+                            <p class="text-xs md:text-sm font-black text-slate-800" x-text="currentUser?.name"></p>
+                            <p class="text-[8px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest" x-text="currentUser?.memberId"></p>
+                        </div>
+                        <button @click="doLogout" class="p-1.5 md:p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all" title="Keluar">
+                            <i data-lucide="log-out" class="w-4 h-4 md:w-5 md:h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="bg-white border-b border-slate-200 sticky top-[64px] md:top-[80px] z-30 overflow-x-auto no-scrollbar shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 md:px-6 flex space-x-6 md:space-x-8 text-sm font-bold whitespace-nowrap">
+                <button @click="memberTab = 'dashboard'" class="py-4 md:py-5 border-b-2 transition-colors" :class="memberTab === 'dashboard' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'">Katalog & Beranda</button>
+                <button @click="memberTab = 'loans'" class="py-4 md:py-5 border-b-2 transition-colors" :class="memberTab === 'loans' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'">Pinjaman Aktif</button>
+                <button @click="memberTab = 'journal'" class="py-4 md:py-5 border-b-2 transition-colors" :class="memberTab === 'journal' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'">Jurnal Membaca</button>
+                <button @click="memberTab = 'card'" class="py-4 md:py-5 border-b-2 transition-colors" :class="memberTab === 'card' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'">Kartu & Profil</button>
+            </div>
+        </div>
+
+        <div x-show="memberTab === 'dashboard'" class="flex-1 animate-in fade-in duration-300">
+            <div class="bg-slate-900 bg-pattern py-12 md:py-20 px-4 md:px-6 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-r from-blue-900/90 to-transparent"></div>
+                <div class="max-w-7xl mx-auto relative z-10">
+                    <span class="bg-blue-600/20 text-blue-300 border border-blue-500/30 px-3 py-1 md:px-4 md:py-1.5 rounded-full text-[10px] md:text-xs font-black uppercase tracking-widest mb-4 md:mb-6 inline-block">Portal Anggota Khusus</span>
+                    <h2 class="text-2xl sm:text-4xl md:text-5xl font-black text-white leading-tight max-w-2xl mb-4 md:mb-6">
+                        Halo, <span class="text-blue-400" x-text="currentUser?.name.split(' ')[0]"></span>!<br>
+                        <span x-text="siteSettings.welcomeMessage" class="text-lg md:text-3xl font-bold text-slate-300 mt-1 md:mt-2 block font-normal"></span>
+                    </h2>
+                    
+                    <div class="flex items-center space-x-2 md:space-x-4 w-full md:max-w-xl bg-white/10 backdrop-blur-md p-1 md:p-2 rounded-xl md:rounded-2xl border border-white/10 mt-6 md:mt-10">
+                        <i data-lucide="search" class="text-white/50 w-4 h-4 md:w-6 md:h-6 ml-3 md:ml-4"></i>
+                        <input type="text" x-model="searchQuery" placeholder="Cari buku yang ingin Anda pinjam..." class="w-full bg-transparent border-none text-white placeholder-white/50 text-sm md:text-base focus:ring-0 p-2 md:p-3 font-bold outline-none">
+                    </div>
+                </div>
+            </div>
+
+            <div class="max-w-7xl mx-auto px-4 md:px-6 -mt-8 md:-mt-10 relative z-20">
+                <div class="flex items-center justify-between mb-6 md:mb-8 mt-10 md:mt-16">
+                    <h3 class="text-xl md:text-2xl font-black text-slate-800" x-text="searchQuery ? 'Hasil Pencarian' : 'Koleksi Tersedia'"></h3>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 mb-12">
+                    <template x-for="book in filteredBooks" :key="book.id">
+                        <div class="bg-white p-3 md:p-4 rounded-2xl md:rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all group relative flex flex-col h-full">
+                            <div class="relative overflow-hidden rounded-xl md:rounded-2xl aspect-[2/3] mb-3 md:mb-4 bg-slate-100 cursor-pointer" @click="requestLoan(book)">
+                                <img :src="book.cover" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                                <div class="absolute top-2 right-2 md:top-3 md:right-3 bg-white/90 backdrop-blur-sm px-2 py-0.5 md:px-2.5 md:py-1 rounded-md md:rounded-lg">
+                                    <span class="text-[8px] md:text-[10px] font-black" :class="book.stock > 0 ? 'text-emerald-600' : 'text-rose-600'" x-text="book.stock > 0 ? 'Tersedia' : 'Kosong'"></span>
+                                </div>
+                            </div>
+                            <div class="flex-1 cursor-pointer" @click="requestLoan(book)">
+                                <span class="text-[8px] md:text-[10px] font-black text-blue-500 uppercase tracking-widest" x-text="book.category"></span>
+                                <h4 class="font-black text-slate-800 mt-1 line-clamp-1 text-sm md:text-lg" x-text="book.title"></h4>
+                                <p class="text-[10px] md:text-xs font-bold text-slate-400 mt-0.5 truncate" x-text="book.author"></p>
+                            </div>
+                            <div class="mt-3 md:mt-4 grid grid-cols-2 gap-2">
+                                <button @click.stop="openFlipbook(book)" class="w-full bg-blue-50 text-blue-600 font-black text-[10px] md:text-xs py-2 rounded-lg md:rounded-xl hover:bg-blue-600 hover:text-white transition-colors flex justify-center items-center"><i data-lucide="book-open" class="w-3 h-3 md:w-4 md:h-4 mr-1"></i> Baca</button>
+                                <button @click.stop="requestLoan(book)" class="w-full bg-amber-50 text-amber-600 font-black text-[10px] md:text-xs py-2 rounded-lg md:rounded-xl hover:bg-amber-500 hover:text-white transition-colors flex justify-center items-center"><i data-lucide="bookmark-plus" class="w-3 h-3 md:w-4 md:h-4 mr-1"></i> Pinjam</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                
+                <div x-show="filteredBooks.length === 0" class="text-center py-20">
+                    <i data-lucide="search-X" class="w-10 h-10 md:w-12 md:h-12 text-slate-300 mx-auto mb-4"></i>
+                    <p class="text-sm md:text-base text-slate-500 font-bold">Buku tidak ditemukan.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: PINJAMAN AKTIF -->
+        <div x-show="memberTab === 'loans'" class="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12 w-full flex-1 animate-in fade-in duration-300">
+            <h3 class="text-2xl md:text-3xl font-black text-slate-800 mb-6 md:mb-8">Pinjaman Aktif Anda</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                <template x-for="loan in myLoans" :key="loan.id">
+                    <div class="bg-white p-4 md:p-6 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col h-full">
+                        <div class="flex items-start space-x-4 mb-4 md:mb-6">
+                            <img :src="books.find(b => b.id === loan.bookId)?.cover" class="w-16 h-24 md:w-20 md:h-28 object-cover rounded-xl shadow-sm bg-slate-100">
+                            <div class="flex-1">
+                                <h4 class="font-black text-base md:text-lg text-slate-800 line-clamp-2" x-text="getBookTitle(loan.bookId)"></h4>
+                                <p class="text-[10px] md:text-xs font-bold text-slate-400 mt-1.5 md:mt-2">Tgl Pinjam: <span x-text="loan.borrowDate"></span></p>
+                                <p class="text-[10px] md:text-xs font-bold text-slate-400 mt-0.5">Batas Kembali: <span class="text-rose-500" x-text="loan.dueDate"></span></p>
+                                <span class="mt-2.5 inline-block px-2.5 py-1 md:px-3 md:py-1 text-[8px] md:text-[10px] font-black uppercase rounded-lg" :class="loan.status === 'Dikembalikan' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'" x-text="loan.status"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-auto grid grid-cols-2 gap-2 md:gap-3" x-show="loan.status === 'Dipinjam'">
+                            <button @click="openFlipbook(books.find(b => b.id === loan.bookId))" class="bg-blue-50 text-blue-600 font-black text-[10px] md:text-xs py-2.5 md:py-3 rounded-xl hover:bg-blue-600 hover:text-white transition-colors flex justify-center items-center"><i data-lucide="book-open" class="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5"></i> Baca Buku</button>
+                            <button @click="returnLoan(loan.id)" class="bg-rose-50 text-rose-600 font-black text-[10px] md:text-xs py-2.5 md:py-3 rounded-xl hover:bg-rose-500 hover:text-white transition-colors flex justify-center items-center"><i data-lucide="undo-2" class="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5"></i> Kembalikan</button>
+                        </div>
+                        <div class="mt-auto w-full" x-show="loan.status === 'Dikembalikan'">
+                            <div class="bg-emerald-50 text-emerald-600 font-black text-[10px] md:text-xs py-2.5 md:py-3 rounded-xl text-center w-full">Telah Dikembalikan pada <span x-text="loan.returnDate"></span></div>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="myLoans.length === 0" class="col-span-full text-center py-12 bg-white rounded-3xl border border-slate-100">
+                    <i data-lucide="book-x" class="w-10 h-10 md:w-12 md:h-12 text-slate-300 mx-auto mb-3"></i>
+                    <p class="text-sm md:text-base text-slate-500 font-bold">Anda belum memiliki pinjaman buku.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: JURNAL MEMBACA -->
+        <div x-show="memberTab === 'journal'" class="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12 w-full flex-1 animate-in fade-in duration-300">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+                <!-- Form Isi Jurnal -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white p-5 md:p-8 rounded-[24px] md:rounded-[32px] shadow-sm border border-slate-100 sticky top-32">
+                        <h3 class="text-xl md:text-2xl font-black text-slate-800 mb-6">Isi Jurnal Baru</h3>
+                        <form @submit.prevent="saveJournal" class="space-y-4">
+                            <div class="space-y-1.5 md:space-y-2">
+                                <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Hari / Tanggal *</label>
+                                <input type="date" x-model="newJournal.date" required class="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-xs md:text-sm">
+                            </div>
+                            <div class="space-y-1.5 md:space-y-2">
+                                <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Judul Buku *</label>
+                                <input type="text" x-model="newJournal.title" required class="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-xs md:text-sm" placeholder="Masukkan judul buku">
+                            </div>
+                            <div class="space-y-1.5 md:space-y-2">
+                                <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Penulis *</label>
+                                <input type="text" x-model="newJournal.author" required class="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-xs md:text-sm" placeholder="Nama penulis buku">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="space-y-1.5 md:space-y-2">
+                                    <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Penerbit</label>
+                                    <input type="text" x-model="newJournal.publisher" class="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-xs md:text-sm" placeholder="Penerbit">
+                                </div>
+                                <div class="space-y-1.5 md:space-y-2">
+                                    <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Halaman</label>
+                                    <input type="number" x-model="newJournal.pages" class="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-xs md:text-sm" placeholder="Jml hal">
+                                </div>
+                            </div>
+                            <div class="space-y-1.5 md:space-y-2">
+                                <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ringkasan Isi Buku *</label>
+                                <textarea x-model="newJournal.summary" required class="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-xs md:text-sm h-32" placeholder="Tuliskan pelajaran/ringkasan yang Anda dapatkan..."></textarea>
+                            </div>
+                            <button type="submit" class="w-full py-3.5 bg-blue-600 text-white rounded-xl font-black shadow-xl shadow-blue-500/30 hover:bg-blue-700 transition-all text-sm mt-2">Simpan Jurnal</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Daftar Jurnal Riwayat -->
+                <div class="lg:col-span-2 space-y-4 md:space-y-6">
+                    <h3 class="text-2xl md:text-3xl font-black text-slate-800 mb-2 lg:mb-6">Catatan Jurnal Saya</h3>
+                    <template x-for="j in myJournals" :key="j.id">
+                        <div class="bg-white p-5 md:p-8 rounded-[24px] md:rounded-[32px] shadow-sm border border-slate-100 relative">
+                            <span class="absolute top-5 right-5 md:top-8 md:right-8 text-[8px] md:text-[10px] font-black bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg uppercase" x-text="j.date"></span>
+                            <h4 class="text-lg md:text-xl font-black text-slate-800 mb-1 pr-20" x-text="j.title"></h4>
+                            <p class="text-[10px] md:text-xs font-bold text-slate-500 mb-4 md:mb-5" x-text="j.author + (j.publisher ? ' • ' + j.publisher : '') + (j.pages ? ' • ' + j.pages + ' hlm' : '')"></p>
+                            <div class="bg-slate-50 p-4 rounded-xl md:rounded-2xl border border-slate-100">
+                                <p class="text-xs md:text-sm font-medium text-slate-600 leading-relaxed whitespace-pre-wrap" x-text="j.summary"></p>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="myJournals.length === 0" class="text-center py-12 md:py-20 bg-white rounded-[32px] border border-slate-100">
+                        <i data-lucide="edit-3" class="w-10 h-10 md:w-12 md:h-12 text-slate-300 mx-auto mb-3 md:mb-4"></i>
+                        <p class="text-sm md:text-base text-slate-500 font-bold">Belum ada jurnal membaca yang diisi.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: KARTU ANGGOTA & PROFIL -->
+        <div x-show="memberTab === 'card'" class="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12 w-full flex-1 animate-in fade-in duration-300">
+            <div class="max-w-xl mx-auto">
+                <h3 class="text-2xl md:text-3xl font-black text-slate-800 mb-2 text-center">Kartu Anggota Digital</h3>
+                <p class="text-slate-500 font-bold text-xs md:text-sm text-center mb-6 md:mb-8">Tunjukkan versi digital ini atau cetak jika diperlukan.</p>
+                
+                <div id="member-card-print" class="w-full aspect-[1.6/1] bg-gradient-to-br from-slate-900 to-blue-900 rounded-[20px] md:rounded-[32px] p-5 md:p-8 text-white relative shadow-2xl overflow-hidden flex flex-col justify-between mb-8">
+                    <div class="absolute -top-10 -right-10 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl"></div>
+                    <div class="relative z-10 flex flex-col h-full flex-1">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h5 class="text-[6px] md:text-[8px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] opacity-60">Library Pass</h5>
+                                <h4 class="text-[10px] md:text-sm font-black italic truncate max-w-[150px] md:max-w-[200px]" x-text="siteSettings.libraryName"></h4>
+                            </div>
+                            <i data-lucide="shield-check" class="w-5 h-5 md:w-6 md:h-6 text-blue-400"></i>
+                        </div>
+                        <div class="flex items-center space-x-4 md:space-x-6 mt-auto">
+                            <img :src="currentUser?.photo" class="w-14 h-14 md:w-20 md:h-20 rounded-xl md:rounded-2xl object-cover border-2 border-white/20 shadow-xl bg-white flex-shrink-0" />
+                            <div class="flex-1 overflow-hidden">
+                                <p class="text-sm md:text-base font-black truncate leading-tight" x-text="currentUser?.name"></p>
+                                <p class="text-[8px] md:text-[10px] font-bold text-blue-400 mt-1 uppercase" x-text="currentUser?.memberId"></p>
+                                <div class="mt-2 md:mt-4 inline-block bg-white/10 px-2.5 py-1 md:px-3 rounded-md md:rounded-lg">
+                                    <p class="text-[8px] md:text-[10px] font-black" x-text="currentUser?.class"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 md:p-8 rounded-[24px] md:rounded-[32px] shadow-sm border border-slate-100 mb-6">
+                    <h4 class="font-black text-slate-800 mb-4">Pengaturan Profil</h4>
+                    <div class="space-y-2">
+                        <label class="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest">Ubah Foto Profil</label>
+                        <input type="file" @change="updateMemberPhoto($event)" accept="image/*" class="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <a :href="'https://wa.me/' + siteSettings.waNumber" target="_blank" class="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-50 bg-[#25D366] text-white p-3 md:p-4 rounded-full shadow-2xl shadow-green-500/30 hover:scale-110 transition-transform flex items-center justify-center group">
+            <svg class="w-6 h-6 md:w-8 md:h-8" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+            <span class="absolute right-full mr-4 bg-slate-900 text-white text-xs font-bold py-2 px-3 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden md:block">Hubungi Admin</span>
+        </a>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VIEW 4: ADMIN DASHBOARD (ADMIN & PETUGAS)  -->
+    <!-- ========================================== -->
+    <div x-show="appState === 'admin'" class="flex min-h-screen relative pb-16 md:pb-0">
+        <div x-show="sidebarOpen" @click="sidebarOpen = false" class="fixed inset-0 bg-slate-900/50 z-40 lg:hidden" x-cloak></div>
+
+        <aside class="w-64 md:w-72 bg-white border-r border-slate-200 fixed inset-y-0 left-0 z-50 transition-transform lg:translate-x-0 lg:static no-print shadow-sm flex flex-col"
+               :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
+            <div class="flex-1 flex flex-col px-4 md:px-6 py-6 md:py-8 overflow-y-auto">
+                <div class="flex items-center space-x-3 mb-8 md:mb-12 px-2">
+                    <div class="w-10 h-10 md:w-12 md:h-12 bg-blue-600 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200 flex-shrink-0">
+                        <i data-lucide="shield" class="w-5 h-5 md:w-6 md:h-6"></i>
+                    </div>
+                    <div class="overflow-hidden">
+                        <h1 class="text-lg md:text-xl font-black tracking-tight text-slate-800">Staf<span class="text-blue-600">Panel</span></h1>
+                        <p class="text-[8px] md:text-[10px] font-bold text-slate-400 tracking-widest uppercase truncate" x-text="siteSettings.libraryName"></p>
+                    </div>
+                </div>
+
+                <nav class="space-y-1.5 md:space-y-2">
+                    <template x-for="item in adminMenuItems" :key="item.id">
+                        <button @click="activeTab = item.id; sidebarOpen = false; currentPageBook=1; currentPageMember=1; currentPageLoan=1; currentPageCollection=1;"
+                                class="w-full flex items-center space-x-3 md:space-x-4 px-4 md:px-5 py-3 rounded-xl md:rounded-2xl transition-all duration-300 group text-left"
+                                :class="activeTab === item.id ? 'sidebar-item-active' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'">
+                            <i :data-lucide="item.icon" class="w-4 h-4 md:w-5 md:h-5 transition-transform group-hover:scale-110"></i>
+                            <span class="font-bold text-xs md:text-sm" x-text="item.label"></span>
+                        </button>
+                    </template>
+                    
+                    <div class="my-4 md:my-8 border-t border-slate-100 mx-2 md:mx-4"></div>
+                    
+                    <button @click="activeTab = 'loans'; sidebarOpen = false"
+                            class="w-full flex items-center space-x-3 md:space-x-4 px-4 md:px-5 py-3 rounded-xl md:rounded-2xl transition-all text-slate-500 hover:bg-slate-50 text-left"
+                            :class="activeTab === 'loans' ? 'sidebar-item-active' : ''">
+                        <i data-lucide="clipboard-list" class="w-4 h-4 md:w-5 md:h-5"></i>
+                        <span class="font-bold text-xs md:text-sm">Peminjaman</span>
+                    </button>
+                    <button @click="activeTab = 'reports'; sidebarOpen = false"
+                            class="w-full flex items-center space-x-3 md:space-x-4 px-4 md:px-5 py-3 rounded-xl md:rounded-2xl transition-all text-slate-500 hover:bg-slate-50 text-left"
+                            :class="activeTab === 'reports' ? 'sidebar-item-active' : ''">
+                        <i data-lucide="file-text" class="w-4 h-4 md:w-5 md:h-5"></i>
+                        <span class="font-bold text-xs md:text-sm">Laporan</span>
+                    </button>
+                    <button x-show="staffRole === 'Admin'" @click="activeTab = 'settings'; sidebarOpen = false"
+                            class="w-full flex items-center space-x-3 md:space-x-4 px-4 md:px-5 py-3 rounded-xl md:rounded-2xl transition-all text-slate-500 hover:bg-slate-50 mt-1 md:mt-2 text-left"
+                            :class="activeTab === 'settings' ? 'sidebar-item-active' : ''">
+                        <i data-lucide="settings" class="w-4 h-4 md:w-5 md:h-5"></i>
+                        <span class="font-bold text-xs md:text-sm">Pengaturan Web</span>
+                    </button>
+                </nav>
+            </div>
+            <div class="p-4 md:p-6 border-t border-slate-100">
+                <div class="flex items-center space-x-3 mb-4 px-2">
+                    <div class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-600 border-2 border-white shadow-sm flex-shrink-0" x-text="staffRole.charAt(0)"></div>
+                    <div class="overflow-hidden">
+                        <p class="text-xs md:text-sm font-black text-slate-800 leading-none truncate" x-text="currentUser?.name"></p>
+                        <p class="text-[8px] md:text-[10px] font-bold text-blue-600 uppercase tracking-widest mt-1" x-text="'ROLE: ' + staffRole"></p>
+                    </div>
+                </div>
+                <button @click="doLogout" class="w-full flex items-center justify-center space-x-2 py-2.5 md:py-3 bg-rose-50 text-rose-600 rounded-xl font-black hover:bg-rose-100 transition-colors text-xs md:text-sm">
+                    <i data-lucide="log-out" class="w-4 h-4"></i><span>Keluar</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Admin -->
+        <main class="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
+            <header class="h-16 md:h-24 bg-white/80 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-30 px-4 md:px-8 flex items-center justify-between no-print shadow-sm">
+                <div class="flex items-center space-x-3 md:space-x-6">
+                    <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden p-2 bg-slate-50 rounded-lg hover:bg-slate-100 text-slate-600">
+                        <i data-lucide="menu" class="w-5 h-5"></i>
+                    </button>
+                    <div class="overflow-hidden max-w-[150px] sm:max-w-xs">
+                        <h2 class="text-sm sm:text-lg md:text-xl font-black text-slate-800 truncate" x-text="getCurrentLabel()"></h2>
+                        <p class="text-[9px] md:text-xs font-bold text-slate-400 mt-0.5 md:mt-1 truncate">Sistem Manajemen Internal</p>
+                    </div>
+                </div>
+
+                <div class="hidden sm:flex relative w-48 md:w-72" x-show="['books','members','loans', 'collections'].includes(activeTab)">
+                    <i data-lucide="search" class="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4"></i>
+                    <input type="text" x-model="searchQuery" placeholder="Pencarian..." class="w-full pl-9 md:pl-12 pr-4 py-2 md:py-3 bg-slate-50 border border-slate-100 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold transition-all focus:ring-2 focus:ring-blue-500">
+                </div>
+            </header>
+
+            <div class="p-4 md:p-8 max-w-[1400px] mx-auto w-full">
+                <!-- Mobile Search Bar -->
+                <div class="sm:hidden mb-4 relative w-full" x-show="['books','members','loans', 'collections'].includes(activeTab)">
+                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4"></i>
+                    <input type="text" x-model="searchQuery" placeholder="Pencarian cepat..." class="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+
+                <!-- VIEW: ADMIN DASHBOARD -->
+                <div x-show="activeTab === 'dashboard'" x-cloak class="space-y-6 md:space-y-10 animate-in fade-in duration-500">
+                    <div x-show="overdueLoans.length > 0" class="bg-rose-50 border-l-4 border-rose-500 p-4 md:p-6 rounded-xl md:rounded-2xl flex items-start space-x-3 md:space-x-4 animate-pulse">
+                        <i data-lucide="alert-triangle" class="text-rose-500 w-5 h-5 md:w-6 md:h-6 flex-shrink-0 mt-0.5"></i>
+                        <div>
+                            <h4 class="text-sm md:text-lg font-black text-rose-700">Perhatian: Ada Buku Terlambat!</h4>
+                            <p class="text-xs md:text-sm font-bold text-rose-600 mt-1">Terdapat <span x-text="overdueLoans.length"></span> transaksi melewati batas waktu.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                        <div class="bg-white p-5 md:p-8 rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm text-center md:text-left">
+                            <div class="hidden md:flex justify-between items-start mb-6">
+                                <div class="p-3 md:p-4 bg-blue-50 text-blue-600 rounded-xl md:rounded-2xl"><i data-lucide="book"></i></div>
+                            </div>
+                            <h3 class="text-2xl md:text-4xl font-black text-slate-800" x-text="books.length"></h3>
+                            <span class="text-[10px] md:text-xs font-black text-slate-500 uppercase">Koleksi Tersedia</span>
+                        </div>
+                        <div class="bg-white p-5 md:p-8 rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm text-center md:text-left">
+                            <div class="hidden md:flex justify-between items-start mb-6">
+                                <div class="p-3 md:p-4 bg-emerald-50 text-emerald-600 rounded-xl md:rounded-2xl"><i data-lucide="users"></i></div>
+                            </div>
+                            <h3 class="text-2xl md:text-4xl font-black text-slate-800" x-text="members.length"></h3>
+                            <span class="text-[10px] md:text-xs font-black text-slate-500 uppercase">Anggota</span>
+                        </div>
+                        <div class="bg-white p-5 md:p-8 rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm text-center md:text-left">
+                            <div class="hidden md:flex justify-between items-start mb-6">
+                                <div class="p-3 md:p-4 bg-amber-50 text-amber-600 rounded-xl md:rounded-2xl"><i data-lucide="clock"></i></div>
+                            </div>
+                            <h3 class="text-2xl md:text-4xl font-black text-slate-800" x-text="loans.filter(l => l.status === 'Dipinjam').length"></h3>
+                            <span class="text-[10px] md:text-xs font-black text-slate-500 uppercase">Dipinjam</span>
+                        </div>
+                        <div class="bg-white p-5 md:p-8 rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm text-center md:text-left">
+                            <div class="hidden md:flex justify-between items-start mb-6">
+                                <div class="p-3 md:p-4 bg-purple-50 text-purple-600 rounded-xl md:rounded-2xl"><i data-lucide="layers"></i></div>
+                            </div>
+                            <h3 class="text-2xl md:text-4xl font-black text-slate-800" x-text="collections.length"></h3>
+                            <span class="text-[10px] md:text-xs font-black text-purple-500 uppercase">Total Inventaris</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 md:p-10 rounded-2xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-x-auto">
+                        <div class="min-w-[400px] h-[200px] md:h-[300px]">
+                            <canvas id="loanChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: BUKU -->
+                <div x-show="activeTab === 'books'" x-cloak class="animate-in fade-in duration-500">
+                    <div class="flex flex-row justify-between items-center mb-6 md:mb-8">
+                        <h3 class="text-xl md:text-3xl font-black text-slate-800 tracking-tight hidden sm:block">Data Katalog Buku</h3>
+                        <button @click="showAddBookModal = true" class="w-full sm:w-auto bg-blue-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all text-xs md:text-base">
+                            <i data-lucide="plus" class="w-4 h-4 md:w-5 md:h-5"></i><span>Tambah Buku</span>
+                        </button>
+                    </div>
+                    
+                    <div class="bg-white rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm mb-6 w-full">
+                        <div class="overflow-x-auto w-full">
+                            <table class="w-full text-left min-w-[500px]">
+                                <thead class="bg-slate-50 text-slate-400 text-[9px] md:text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
+                                    <tr>
+                                        <th class="p-4 md:p-6 pl-4 md:pl-8">Buku</th>
+                                        <th class="p-4 md:p-6">Detail</th>
+                                        <th class="p-4 md:p-6 text-center">Stok</th>
+                                        <th class="p-4 md:p-6 pr-4 md:pr-8 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-50">
+                                    <template x-for="book in paginatedBooks" :key="book.id">
+                                        <tr class="hover:bg-slate-50/50 transition-colors">
+                                            <td class="p-4 md:p-6 pl-4 md:pl-8">
+                                                <div class="flex items-center space-x-3 md:space-x-4">
+                                                    <img :src="book.cover" class="w-10 h-14 md:w-12 md:h-16 rounded-md md:rounded-lg object-cover shadow-sm bg-slate-100 flex-shrink-0" />
+                                                    <div class="max-w-[150px] md:max-w-xs">
+                                                        <p class="font-bold text-slate-800 text-sm md:text-base truncate" x-text="book.title"></p>
+                                                        <p class="text-[10px] md:text-xs font-bold text-slate-400 truncate" x-text="book.author"></p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="p-4 md:p-6">
+                                                <p class="font-mono text-[10px] md:text-xs font-black text-blue-600" x-text="book.code"></p>
+                                                <span class="text-[8px] md:text-[10px] font-black uppercase tracking-wider text-slate-500" x-text="book.category"></span>
+                                            </td>
+                                            <td class="p-4 md:p-6 text-center font-black text-base md:text-lg" :class="book.stock > 0 ? 'text-emerald-600' : 'text-rose-600'" x-text="book.stock"></td>
+                                            <td class="p-4 md:p-6 pr-4 md:pr-8 text-right whitespace-nowrap">
+                                                <button @click="prepareEditBook(book)" class="p-1.5 md:p-2 bg-blue-50 text-blue-600 rounded-lg md:rounded-xl mr-1 hover:bg-blue-100"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                                                <button x-show="staffRole === 'Admin'" @click="deleteBook(book.id)" class="p-1.5 md:p-2 bg-rose-50 text-rose-600 rounded-lg md:rounded-xl hover:bg-rose-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="paginatedBooks.length === 0">
+                                        <td colspan="4" class="p-6 md:p-8 text-center text-slate-400 font-bold italic text-sm">Data tidak ditemukan.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center bg-white p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shadow-sm" x-show="totalPagesBook > 1">
+                        <button @click="currentPageBook--" :disabled="currentPageBook === 1" class="px-3 md:px-4 py-1.5 md:py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs md:text-sm disabled:opacity-50">Prev</button>
+                        <span class="text-xs md:text-sm font-black text-slate-500" x-text="currentPageBook + ' / ' + totalPagesBook"></span>
+                        <button @click="currentPageBook++" :disabled="currentPageBook === totalPagesBook" class="px-3 md:px-4 py-1.5 md:py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs md:text-sm disabled:opacity-50">Next</button>
+                    </div>
+                </div>
+
+                <!-- VIEW: INVENTARIS KOLEKSI (FITUR BARU) -->
+                <div x-show="activeTab === 'collections'" x-cloak class="animate-in fade-in duration-500">
+                    <div class="flex flex-row justify-between items-center mb-6 md:mb-8">
+                        <h3 class="text-xl md:text-3xl font-black text-slate-800 tracking-tight hidden sm:block">Inventaris Koleksi</h3>
+                        <button @click="showAddCollectionModal = true" class="w-full sm:w-auto bg-purple-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black flex items-center justify-center space-x-2 shadow-lg shadow-purple-500/20 hover:bg-purple-700 transition-all text-xs md:text-base">
+                            <i data-lucide="plus" class="w-4 h-4 md:w-5 md:h-5"></i><span>Tambah Koleksi</span>
+                        </button>
+                    </div>
+                    
+                    <div class="bg-white rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm mb-6 w-full">
+                        <div class="overflow-x-auto w-full">
+                            <table class="w-full text-left min-w-[700px]">
+                                <thead class="bg-slate-50 text-slate-400 text-[9px] md:text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
+                                    <tr>
+                                        <th class="p-4 md:p-6 pl-4 md:pl-8">Jenis Buku</th>
+                                        <th class="p-4 md:p-6">Judul Buku</th>
+                                        <th class="p-4 md:p-6 text-center">Jumlah Judul</th>
+                                        <th class="p-4 md:p-6 text-center">Jml Eksemplar</th>
+                                        <th class="p-4 md:p-6 pr-4 md:pr-8 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-50">
+                                    <template x-for="col in filteredCollections" :key="col.id">
+                                        <tr class="hover:bg-slate-50/50 transition-colors">
+                                            <td class="p-4 md:p-6 pl-4 md:pl-8">
+                                                <span class="px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wider" :class="col.type === 'Digital' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'" x-text="'Koleksi ' + col.type"></span>
+                                                <p class="font-bold text-slate-800 text-sm md:text-base mt-2" x-text="col.jenis"></p>
+                                            </td>
+                                            <td class="p-4 md:p-6 font-bold text-slate-600 text-xs md:text-sm max-w-[200px] truncate" x-text="col.judul"></td>
+                                            <td class="p-4 md:p-6 text-center font-black text-base md:text-lg text-slate-800" x-text="col.jumlahJudul"></td>
+                                            <td class="p-4 md:p-6 text-center font-black text-base md:text-lg text-slate-800" x-text="col.jumlahEksemplar"></td>
+                                            <td class="p-4 md:p-6 pr-4 md:pr-8 text-right whitespace-nowrap">
+                                                <button @click="prepareEditCollection(col)" class="p-1.5 md:p-2 bg-blue-50 text-blue-600 rounded-lg md:rounded-xl mr-1 hover:bg-blue-100"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                                                <button x-show="staffRole === 'Admin'" @click="deleteCollection(col.id)" class="p-1.5 md:p-2 bg-rose-50 text-rose-600 rounded-lg md:rounded-xl hover:bg-rose-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="filteredCollections.length === 0">
+                                        <td colspan="5" class="p-6 md:p-8 text-center text-slate-400 font-bold italic text-sm">Data inventaris tidak ditemukan.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: ANGGOTA -->
+                <div x-show="activeTab === 'members'" x-cloak class="animate-in fade-in duration-500">
+                    <div class="flex flex-row justify-between items-center mb-6 md:mb-8">
+                        <h3 class="text-xl md:text-3xl font-black text-slate-800 tracking-tight hidden sm:block">Data Anggota</h3>
+                        <button @click="showAddMemberModal = true" class="w-full sm:w-auto bg-emerald-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all text-xs md:text-base">
+                            <i data-lucide="plus" class="w-4 h-4 md:w-5 md:h-5"></i><span>Tambah Anggota</span>
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+                        <template x-for="member in paginatedMembers" :key="member.id">
+                            <div class="bg-white p-4 md:p-6 rounded-2xl md:rounded-[32px] border border-slate-100 text-center shadow-sm relative group">
+                                <button x-show="staffRole === 'Admin'" @click="deleteMember(member.id)" class="absolute top-2 right-2 md:top-4 md:right-4 p-1 md:p-1.5 text-slate-300 hover:bg-rose-50 hover:text-rose-500 rounded-md md:rounded-lg opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
+                                    <i data-lucide="x" class="w-4 h-4"></i>
+                                </button>
+                                <img :src="member.photo" class="w-16 h-16 md:w-20 md:h-20 rounded-full mx-auto mb-3 md:mb-4 object-cover ring-2 md:ring-4 ring-slate-50 bg-slate-100">
+                                <h4 class="font-black text-slate-800 line-clamp-1 text-sm md:text-base" x-text="member.name"></h4>
+                                <p class="text-[10px] md:text-xs font-bold text-slate-400 mb-1" x-text="member.memberId"></p>
+                                <span class="text-[8px] md:text-[10px] font-black uppercase text-blue-500 mb-4 md:mb-6 inline-block" x-text="member.class"></span>
+                                
+                                <div class="flex justify-center space-x-1.5 md:space-x-2">
+                                    <button @click="showMemberCard(member)" class="flex-1 text-[10px] md:text-xs font-black bg-slate-900 text-white py-1.5 md:py-2 rounded-lg md:rounded-xl hover:bg-blue-600 transition-colors">KARTU</button>
+                                    <button @click="prepareEditMember(member)" class="px-2 md:px-3 bg-slate-100 text-slate-500 rounded-lg md:rounded-xl hover:bg-slate-200 transition-colors"><i data-lucide="edit-2" class="w-3 h-3 md:w-3.5 md:h-3.5"></i></button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div x-show="paginatedMembers.length === 0" class="text-center py-10 bg-white rounded-2xl border border-slate-100">
+                        <p class="text-slate-400 font-bold italic text-sm">Anggota tidak ditemukan.</p>
+                    </div>
+
+                    <div class="flex justify-between items-center bg-white p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shadow-sm" x-show="totalPagesMember > 1">
+                        <button @click="currentPageMember--" :disabled="currentPageMember === 1" class="px-3 md:px-4 py-1.5 md:py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs md:text-sm disabled:opacity-50">Prev</button>
+                        <span class="text-xs md:text-sm font-black text-slate-500" x-text="currentPageMember + ' / ' + totalPagesMember"></span>
+                        <button @click="currentPageMember++" :disabled="currentPageMember === totalPagesMember" class="px-3 md:px-4 py-1.5 md:py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs md:text-sm disabled:opacity-50">Next</button>
+                    </div>
+                </div>
+
+                <!-- VIEW: PEMINJAMAN ADMIN -->
+                <div x-show="activeTab === 'loans'" x-cloak class="animate-in fade-in duration-500">
+                    <div class="flex flex-row justify-between items-center mb-6 md:mb-8">
+                        <h3 class="text-xl md:text-3xl font-black text-slate-800 tracking-tight hidden sm:block">Peminjaman</h3>
+                        <button @click="showAddLoanModal = true" class="w-full sm:w-auto bg-amber-500 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black flex items-center justify-center space-x-2 shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all text-xs md:text-base">
+                            <i data-lucide="plus" class="w-4 h-4 md:w-5 h-5"></i><span>Transaksi Baru</span>
+                        </button>
+                    </div>
+                    
+                    <div class="bg-white rounded-2xl md:rounded-[32px] overflow-hidden border border-slate-100 shadow-sm mb-6 w-full">
+                        <div class="overflow-x-auto w-full">
+                            <table class="w-full text-left min-w-[600px]">
+                                <thead class="bg-slate-50 text-slate-400 text-[9px] md:text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
+                                    <tr>
+                                        <th class="p-4 md:p-6 pl-4 md:pl-8">Info Peminjam</th>
+                                        <th class="p-4 md:p-6">Tanggal</th>
+                                        <th class="p-4 md:p-6 text-center">Status</th>
+                                        <th class="p-4 md:p-6 pr-4 md:pr-8 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-50">
+                                    <template x-for="loan in paginatedLoans" :key="loan.id">
+                                        <tr class="hover:bg-slate-50/50 transition-colors">
+                                            <td class="p-4 md:p-6 pl-4 md:pl-8">
+                                                <p class="font-black text-sm md:text-base text-slate-800 truncate max-w-[120px] md:max-w-xs" x-text="getMemberName(loan.memberId)"></p>
+                                                <p class="font-bold text-[10px] md:text-xs text-slate-500 truncate max-w-[120px] md:max-w-xs mt-0.5" x-text="getBookTitle(loan.bookId)"></p>
+                                            </td>
+                                            <td class="p-4 md:p-6">
+                                                <p class="text-[10px] md:text-xs font-bold text-slate-500">P: <span x-text="loan.borrowDate"></span></p>
+                                                <p class="text-[10px] md:text-xs font-bold mt-0.5" :class="(loan.dueDate < new Date().toISOString().split('T')[0] && loan.status === 'Dipinjam') ? 'text-rose-600' : 'text-slate-500'">K: <span x-text="loan.dueDate"></span></p>
+                                            </td>
+                                            <td class="p-4 md:p-6 text-center">
+                                                <span class="px-2 py-1 md:px-3 md:py-1 rounded-md md:rounded-lg text-[8px] md:text-[10px] font-black uppercase tracking-wider" :class="loan.status==='Dipinjam'?'bg-amber-50 text-amber-600':'bg-emerald-50 text-emerald-600'" x-text="loan.status"></span>
+                                            </td>
+                                            <td class="p-4 md:p-6 pr-4 md:pr-8 text-right">
+                                                <button x-show="loan.status==='Dipinjam'" @click="returnLoan(loan.id)" class="text-[10px] md:text-xs bg-slate-900 text-white px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl font-black hover:bg-blue-600 transition-colors whitespace-nowrap">Terima Buku</button>
+                                                <span x-show="loan.status === 'Dikembalikan'" class="text-[8px] md:text-[10px] font-black text-slate-300 uppercase block">Telah Kembali</span>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="paginatedLoans.length === 0">
+                                        <td colspan="4" class="p-6 text-center text-slate-400 font-bold italic text-sm">Tidak ada transaksi.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center bg-white p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shadow-sm" x-show="totalPagesLoan > 1">
+                        <button @click="currentPageLoan--" :disabled="currentPageLoan === 1" class="px-3 md:px-4 py-1.5 md:py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs md:text-sm disabled:opacity-50">Prev</button>
+                        <span class="text-xs md:text-sm font-black text-slate-500" x-text="currentPageLoan + ' / ' + totalPagesLoan"></span>
+                        <button @click="currentPageLoan++" :disabled="currentPageLoan === totalPagesLoan" class="px-3 md:px-4 py-1.5 md:py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs md:text-sm disabled:opacity-50">Next</button>
+                    </div>
+                </div>
+
+                <!-- VIEW: LAPORAN -->
+                <div x-show="activeTab === 'reports'" x-cloak class="animate-in fade-in duration-500">
+                    <div class="bg-white p-5 md:p-8 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 mb-6 md:mb-8 print:hidden">
+                        <div class="flex flex-col lg:flex-row justify-between lg:items-end gap-4 md:gap-6">
+                            <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 w-full">
+                                <div class="space-y-1 md:space-y-2">
+                                    <label class="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Jenis Laporan</label>
+                                    <select x-model="reportConfig.type" class="w-full p-2.5 md:p-3 bg-slate-50 border-none rounded-lg md:rounded-xl font-bold text-xs md:text-sm">
+                                        <option value="buku">Laporan Data Buku</option>
+                                        <option value="anggota">Laporan Anggota</option>
+                                        <option value="peminjaman">Laporan Peminjaman</option>
+                                        <option value="pengembalian">Laporan Pengembalian</option>
+                                    </select>
+                                </div>
+                                <div class="space-y-1 md:space-y-2">
+                                    <label class="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Mulai (Opsional)</label>
+                                    <input x-model="reportConfig.startDate" type="date" class="w-full p-2.5 md:p-3 bg-slate-50 border-none rounded-lg md:rounded-xl font-bold text-xs md:text-sm">
+                                </div>
+                                <div class="space-y-1 md:space-y-2">
+                                    <label class="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Sampai (Opsional)</label>
+                                    <input x-model="reportConfig.endDate" type="date" class="w-full p-2.5 md:p-3 bg-slate-50 border-none rounded-lg md:rounded-xl font-bold text-xs md:text-sm">
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap gap-2 md:gap-3 mt-2 lg:mt-0 w-full lg:w-auto">
+                                <button @click="exportToExcel()" class="flex-1 lg:flex-none px-3 md:px-5 py-2.5 md:py-3 bg-emerald-50 text-emerald-600 rounded-lg md:rounded-xl font-black hover:bg-emerald-100 transition-colors flex items-center justify-center space-x-2 text-xs md:text-sm">
+                                    <i data-lucide="sheet" class="w-4 h-4"></i><span class="hidden sm:inline">Excel</span>
+                                </button>
+                                <button @click="exportToPDF()" class="flex-1 lg:flex-none px-3 md:px-5 py-2.5 md:py-3 bg-rose-50 text-rose-600 rounded-lg md:rounded-xl font-black hover:bg-rose-100 transition-colors flex items-center justify-center space-x-2 text-xs md:text-sm">
+                                    <i data-lucide="file-text" class="w-4 h-4"></i><span class="hidden sm:inline">PDF</span>
+                                </button>
+                                <button @click="window.print()" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 md:px-6 py-2.5 md:py-3 bg-blue-600 text-white rounded-lg md:rounded-xl font-black shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-all flex items-center justify-center space-x-2 text-xs md:text-sm">
+                                    <i data-lucide="printer" class="w-4 h-4"></i><span>Cetak</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AREA CETAK LAPORAN -->
+                    <div id="report-print-area" class="bg-white p-4 sm:p-6 md:p-10 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 overflow-x-auto w-full">
+                        <div class="min-w-[600px]">
+                            <div class="text-center mb-6 md:mb-8 pb-6 md:pb-8 border-b border-slate-100">
+                                <h2 class="text-lg md:text-2xl font-black text-slate-800 uppercase" x-text="siteSettings.libraryName"></h2>
+                                <p class="text-xs md:text-sm font-bold text-slate-500 uppercase mt-1 md:mt-2 tracking-widest">
+                                    Laporan <span x-text="reportConfig.type"></span>
+                                </p>
+                                <p class="text-[10px] md:text-xs font-bold text-slate-400 mt-1" x-show="reportConfig.startDate">
+                                    Periode: <span x-text="reportConfig.startDate"></span> s/d <span x-text="reportConfig.endDate || 'Sekarang'"></span>
+                                </p>
+                            </div>
+
+                            <div x-show="reportConfig.type === 'buku'">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-50 border-b-2 border-slate-200 text-slate-700 font-black text-xs md:text-sm">
+                                            <th class="p-2 md:p-3">Kode</th><th class="p-2 md:p-3">Judul Buku</th><th class="p-2 md:p-3">Pengarang</th><th class="p-2 md:p-3">Kategori</th><th class="p-2 md:p-3 text-center">Stok</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="b in books" :key="b.id">
+                                            <tr class="border-b border-slate-100">
+                                                <td class="p-2 md:p-3 font-mono text-[10px] md:text-xs" x-text="b.code"></td>
+                                                <td class="p-2 md:p-3 font-bold text-xs md:text-sm" x-text="b.title"></td>
+                                                <td class="p-2 md:p-3 text-[10px] md:text-xs" x-text="b.author"></td>
+                                                <td class="p-2 md:p-3 text-[10px] md:text-xs uppercase font-bold text-slate-400" x-text="b.category"></td>
+                                                <td class="p-2 md:p-3 font-black text-emerald-600 text-center text-xs md:text-sm" x-text="b.stock"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div x-show="reportConfig.type === 'anggota'">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-50 border-b-2 border-slate-200 text-slate-700 font-black text-xs md:text-sm">
+                                            <th class="p-2 md:p-3">ID Anggota</th><th class="p-2 md:p-3">Nama Lengkap</th><th class="p-2 md:p-3">Kelas</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="m in members" :key="m.id">
+                                            <tr class="border-b border-slate-100">
+                                                <td class="p-2 md:p-3 font-mono text-xs md:text-sm font-bold text-blue-600" x-text="m.memberId"></td>
+                                                <td class="p-2 md:p-3 font-black text-xs md:text-sm" x-text="m.name"></td>
+                                                <td class="p-2 md:p-3 text-[10px] md:text-xs font-bold uppercase" x-text="m.class"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div x-show="reportConfig.type === 'peminjaman' || reportConfig.type === 'pengembalian'">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-50 border-b-2 border-slate-200 text-slate-700 font-black text-xs md:text-sm">
+                                            <th class="p-2 md:p-3">Tgl Pinjam</th><th class="p-2 md:p-3">Anggota</th><th class="p-2 md:p-3">Buku</th><th class="p-2 md:p-3">Batas Kembali</th><th class="p-2 md:p-3">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="l in filteredReportLoans" :key="l.id">
+                                            <tr class="border-b border-slate-100">
+                                                <td class="p-2 md:p-3 text-[10px] md:text-xs font-bold" x-text="l.borrowDate"></td>
+                                                <td class="p-2 md:p-3 font-bold text-xs md:text-sm text-slate-800" x-text="getMemberName(l.memberId)"></td>
+                                                <td class="p-2 md:p-3 text-[10px] md:text-xs font-bold text-slate-500" x-text="getBookTitle(l.bookId)"></td>
+                                                <td class="p-2 md:p-3 text-[10px] md:text-xs font-bold text-rose-500" x-text="l.dueDate"></td>
+                                                <td class="p-2 md:p-3 text-[8px] md:text-[10px] font-black uppercase" :class="l.status === 'Dikembalikan' ? 'text-emerald-500' : 'text-amber-500'" x-text="l.status"></td>
+                                            </tr>
+                                        </template>
+                                        <tr x-show="filteredReportLoans.length === 0">
+                                            <td colspan="5" class="p-6 md:p-8 text-center text-slate-400 font-bold italic text-xs md:text-sm">Tidak ada data ditemukan.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: PENGATURAN WEB -->
+                <div x-show="activeTab === 'settings' && staffRole === 'Admin'" x-cloak class="animate-in fade-in duration-500 max-w-2xl mx-auto w-full">
+                    <h3 class="text-2xl md:text-3xl font-black text-slate-800 tracking-tight mb-1 md:mb-2">Pengaturan Web</h3>
+                    <p class="text-xs md:text-sm text-slate-400 font-bold mb-6 md:mb-8">Ubah tampilan informasi publik dan kontak.</p>
+
+                    <form @submit.prevent="saveSettings" class="bg-white p-6 md:p-10 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 space-y-4 md:space-y-6">
+                        <div class="space-y-1.5 md:space-y-2">
+                            <label class="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest">Nama Perpustakaan</label>
+                            <input x-model="siteSettings.libraryName" type="text" required class="w-full p-3 md:p-4 bg-slate-50 border-none rounded-xl md:rounded-2xl font-bold text-sm">
+                        </div>
+                        <div class="space-y-1.5 md:space-y-2">
+                            <label class="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest">Pesan Sambutan (Beranda)</label>
+                            <textarea x-model="siteSettings.welcomeMessage" required class="w-full p-3 md:p-4 bg-slate-50 border-none rounded-xl md:rounded-2xl font-bold h-20 md:h-24 text-sm"></textarea>
+                        </div>
+                        <div class="space-y-1.5 md:space-y-2">
+                            <label class="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest">Nomor WhatsApp (Admin)</label>
+                            <input x-model="siteSettings.waNumber" type="text" required class="w-full p-3 md:p-4 bg-slate-50 border-none rounded-xl md:rounded-2xl font-bold text-sm" placeholder="Mulai dengan 62...">
+                            <p class="text-[8px] md:text-[10px] text-slate-400 font-bold leading-tight">Gunakan format internasional tanpa tanda + (contoh: 62812...)</p>
+                        </div>
+                        
+                        <div class="pt-4 md:pt-6 border-t border-slate-100">
+                            <button type="submit" class="w-full py-3 md:py-4 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black shadow-xl shadow-blue-500/30 hover:bg-blue-700 transition-all text-sm md:text-base">
+                                Simpan Perubahan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODALS UTAMA PERPUSTAKAAN                  -->
+    <!-- ========================================== -->
+
+    <!-- MODAL: BUKU TAMU (GUESTBOOK) -->
+    <div x-show="showGuestbookModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+        <form @submit.prevent="submitGuestbook" class="bg-white rounded-[24px] sm:rounded-[40px] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-300 m-auto mt-16 sm:mt-auto">
+            <div class="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl sm:text-2xl font-black text-slate-800">Buku Tamu</h3>
+                <button type="button" @click="showGuestbookModal = false" class="p-2 sm:p-3 hover:bg-slate-100 rounded-lg sm:rounded-2xl text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 sm:p-8 space-y-4 sm:space-y-6">
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Hari / Tanggal *</label>
+                    <input x-model="guestbookEntry.date" type="date" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Nama Lengkap *</label>
+                    <input x-model="guestbookEntry.name" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="Nama Anda">
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Asal Instansi / Sekolah *</label>
+                    <input x-model="guestbookEntry.institution" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="Contoh: SD Katholik Waimamongu">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kabupaten / Kota *</label>
+                        <input x-model="guestbookEntry.district" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="Contoh: Sumba Barat">
+                    </div>
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Provinsi *</label>
+                        <input x-model="guestbookEntry.province" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="Contoh: NTT">
+                    </div>
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Keterangan *</label>
+                    <select x-model="guestbookEntry.type" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                        <option value="Umum">Umum</option>
+                        <option value="Anggota">Anggota</option>
+                        <option value="Admin">Admin</option>
+                    </select>
+                </div>
+            </div>
+            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
+                <button type="button" @click="showGuestbookModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
+                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-blue-600 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all text-sm">Simpan & Mulai Membaca</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- MODAL: FLIPBOOK VIEWER -->
+    <div x-show="showFlipbookModal" x-cloak class="fixed inset-0 z-[200] bg-slate-900 flex flex-col animate-in fade-in duration-300">
+        <div class="p-3 md:p-4 flex justify-between items-center bg-slate-900 text-white border-b border-white/10 shadow-md">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                    <i data-lucide="book-open" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h3 class="font-black text-sm md:text-base truncate max-w-[200px] md:max-w-md" x-text="currentReadBook?.title"></h3>
+                    <p class="text-[10px] text-slate-400 font-bold" x-text="currentReadBook?.author"></p>
+                </div>
+            </div>
+            <div class="flex items-center">
+                <a :href="currentReadBook?.link" target="_blank" class="p-2 bg-blue-500 hover:bg-blue-400 rounded-lg transition-colors flex items-center space-x-2 text-white mr-2" title="Buka di Tab Baru jika PDF tidak muncul">
+                    <i data-lucide="external-link" class="w-4 h-4"></i>
+                    <span class="text-xs font-bold hidden md:inline">Buka Eksternal</span>
+                </a>
+                <button @click="showFlipbookModal = false" class="p-2 bg-white/10 hover:bg-rose-500 rounded-lg transition-colors flex items-center space-x-2">
+                    <span class="text-xs font-bold hidden md:inline">Tutup</span>
+                    <i data-lucide="x" class="w-4 h-4 md:w-5 md:h-5"></i>
+                </button>
+            </div>
+        </div>
+        <div class="flex-1 w-full bg-slate-800 p-2 md:p-6 flex justify-center items-center overflow-hidden relative">
+            <div class="w-full max-w-5xl h-full bg-[#323639] rounded-xl md:rounded-2xl shadow-2xl overflow-hidden relative">
+                <iframe :src="currentReadBook?.link || ''" class="w-full h-full border-0"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: TAMBAH KOLEKSI (ADMIN) -->
+    <div x-show="showAddCollectionModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+        <form @submit.prevent="addCollection" class="bg-white rounded-[24px] sm:rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 m-auto mt-16 sm:mt-auto">
+            <div class="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl sm:text-2xl font-black text-slate-800">Tambah Inventaris Koleksi</h3>
+                <button type="button" @click="showAddCollectionModal = false" class="p-2 sm:p-3 hover:bg-slate-100 rounded-lg sm:rounded-2xl text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 sm:p-8 space-y-4 sm:space-y-6">
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kategori Koleksi *</label>
+                    <select x-model="newCollection.type" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                        <option value="Digital">Koleksi Digital</option>
+                        <option value="Fisik">Koleksi Fisik</option>
+                    </select>
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Jenis Buku *</label>
+                    <input x-model="newCollection.jenis" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="Contoh: Buku Teks Pelajaran">
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Judul Buku (Atau Deskripsi) *</label>
+                    <input x-model="newCollection.judul" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="Contoh: Matematika Kelas 6">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Jumlah Judul *</label>
+                        <input x-model.number="newCollection.jumlahJudul" type="number" min="1" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Jumlah Eksemplar *</label>
+                        <input x-model.number="newCollection.jumlahEksemplar" type="number" min="1" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                </div>
+            </div>
+            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
+                <button type="button" @click="showAddCollectionModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
+                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-purple-600 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-purple-100 hover:bg-purple-700 transition-all text-sm">Simpan Inventaris</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- MODAL: EDIT KOLEKSI (ADMIN) -->
+    <div x-show="showEditCollectionModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+        <form @submit.prevent="updateCollection" class="bg-white rounded-[24px] sm:rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 m-auto mt-16 sm:mt-auto">
+            <div class="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl sm:text-2xl font-black text-slate-800">Edit Inventaris Koleksi</h3>
+                <button type="button" @click="showEditCollectionModal = false" class="p-2 sm:p-3 hover:bg-slate-100 rounded-lg sm:rounded-2xl text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 sm:p-8 space-y-4 sm:space-y-6">
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kategori Koleksi *</label>
+                    <select x-model="editingCollection.type" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                        <option value="Digital">Koleksi Digital</option>
+                        <option value="Fisik">Koleksi Fisik</option>
+                    </select>
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Jenis Buku *</label>
+                    <input x-model="editingCollection.jenis" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Judul Buku (Atau Deskripsi) *</label>
+                    <input x-model="editingCollection.judul" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Jumlah Judul *</label>
+                        <input x-model.number="editingCollection.jumlahJudul" type="number" min="1" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Jumlah Eksemplar *</label>
+                        <input x-model.number="editingCollection.jumlahEksemplar" type="number" min="0" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                </div>
+            </div>
+            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
+                <button type="button" @click="showEditCollectionModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
+                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-purple-600 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-purple-100 hover:bg-purple-700 transition-all text-sm">Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- MODAL: PINJAM BUKU (MEMBER) -->
+    <div x-show="showMemberLoanModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+        <form @submit.prevent="confirmMemberLoan" class="bg-white rounded-[24px] sm:rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-300 m-auto mt-16 sm:mt-auto">
+            <div class="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl sm:text-2xl font-black text-slate-800">Pinjam Buku</h3>
+                <button type="button" @click="showMemberLoanModal = false" class="p-2 sm:p-3 hover:bg-slate-100 rounded-lg sm:rounded-2xl text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 sm:p-8 space-y-4 sm:space-y-6">
+                <div class="bg-blue-50 p-4 rounded-xl md:rounded-2xl flex items-center space-x-4 border border-blue-100">
+                    <img :src="currentReadBook?.cover" class="w-12 h-16 object-cover rounded-lg shadow-sm">
+                    <div>
+                        <h4 class="font-black text-slate-800 text-sm md:text-base line-clamp-1" x-text="currentReadBook?.title"></h4>
+                        <p class="text-[10px] md:text-xs font-bold text-slate-500" x-text="currentReadBook?.author"></p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Tgl Pinjam</label>
+                        <input x-model="newLoan.borrowDate" type="date" readonly class="w-full p-3 sm:p-4 bg-slate-100 text-slate-500 border-none rounded-xl sm:rounded-2xl font-bold text-sm outline-none">
+                    </div>
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Tgl Kembali</label>
+                        <input x-model="newLoan.dueDate" type="date" readonly class="w-full p-3 sm:p-4 bg-slate-100 text-slate-500 border-none rounded-xl sm:rounded-2xl font-bold text-sm outline-none">
+                    </div>
+                </div>
+                <p class="text-[10px] sm:text-xs text-slate-400 font-bold text-center italic mt-2">Pastikan Anda mengembalikan buku tepat waktu untuk menghindari sanksi administratif.</p>
+            </div>
+            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
+                <button type="button" @click="showMemberLoanModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
+                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-amber-500 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-amber-100 hover:bg-amber-600 transition-all text-sm">Konfirmasi Pinjam</button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- MODAL: TAMBAH BUKU (ADMIN) -->
+    <div x-show="showAddBookModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+        <form @submit.prevent="addBook" class="bg-white rounded-[24px] sm:rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 m-auto mt-16 sm:mt-auto">
+            <div class="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl sm:text-2xl font-black text-slate-800">Buku Baru</h3>
+                <button type="button" @click="showAddBookModal = false" class="p-2 sm:p-3 hover:bg-slate-100 rounded-lg sm:rounded-2xl text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 sm:p-8 space-y-4 sm:space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Judul Buku *</label>
+                        <input x-model="newBook.title" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="Contoh: Sang Pemimpi">
+                    </div>
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kode Buku *</label>
+                        <input x-model="newBook.code" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="B-123">
+                    </div>
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Pengarang *</label>
+                    <input x-model="newBook.author" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="Nama Penulis">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kategori</label>
+                        <select x-model="newBook.category" class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                            <option>Novel</option><option>Sains</option><option>Sejarah</option><option>Biografi</option><option>Fiksi</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Stok Awal *</label>
+                        <input x-model.number="newBook.stock" type="number" min="1" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Link Buku (Google Drive/PDF)</label>
+                    <input x-model="newBook.link" type="url" class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="https://...">
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Upload Cover (Opsional)</label>
+                    <input type="file" @change="handleFileUpload($event, newBook, 'cover')" accept="image/*" class="w-full p-2.5 sm:p-3 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] sm:file:text-xs file:font-black file:bg-blue-50 file:text-blue-700">
+                </div>
+            </div>
+            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
+                <button type="button" @click="showAddBookModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
+                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-blue-600 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all text-sm">Simpan Data</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- MODAL: EDIT BUKU (ADMIN) -->
+    <div x-show="showEditBookModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+        <form @submit.prevent="updateBook" class="bg-white rounded-[24px] sm:rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 m-auto mt-16 sm:mt-auto">
+            <div class="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl sm:text-2xl font-black text-slate-800">Edit Data Buku</h3>
+                <button type="button" @click="showEditBookModal = false" class="p-2 sm:p-3 hover:bg-slate-100 rounded-lg sm:rounded-2xl text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 sm:p-8 space-y-4 sm:space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Judul Buku *</label>
+                        <input x-model="editingBook.title" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kode Buku *</label>
+                        <input x-model="editingBook.code" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Pengarang *</label>
+                    <input x-model="editingBook.author" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kategori</label>
+                        <select x-model="editingBook.category" class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                            <option>Novel</option><option>Sains</option><option>Sejarah</option><option>Biografi</option><option>Fiksi</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Stok *</label>
+                        <input x-model.number="editingBook.stock" type="number" min="0" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Link Buku (Google Drive/PDF)</label>
+                    <input x-model="editingBook.link" type="url" class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="https://...">
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Ganti Cover (Opsional)</label>
+                    <input type="file" @change="handleFileUpload($event, editingBook, 'cover')" accept="image/*" class="w-full p-2.5 sm:p-3 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] sm:file:text-xs file:font-black file:bg-blue-50 file:text-blue-700">
+                </div>
+            </div>
+            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
+                <button type="button" @click="showEditBookModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
+                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-blue-600 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all text-sm">Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- MODAL: TAMBAH ANGGOTA (ADMIN) -->
+    <div x-show="showAddMemberModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+        <form @submit.prevent="addMember" class="bg-white rounded-[24px] sm:rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 m-auto mt-16 sm:mt-auto">
+            <div class="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl sm:text-2xl font-black text-slate-800">Anggota Baru</h3>
+                <button type="button" @click="showAddMemberModal = false" class="p-2 sm:p-3 hover:bg-slate-100 rounded-lg sm:rounded-2xl text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 sm:p-8 space-y-4 sm:space-y-6">
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Nama Lengkap *</label>
+                    <input x-model="newMember.name" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="Nama Lengkap">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Nomor Induk (ID Otomatis) *</label>
+                        <input :value="nextMemberId" type="text" readonly class="w-full p-3 sm:p-4 bg-slate-100 text-slate-400 border-none rounded-xl sm:rounded-2xl font-black text-sm cursor-not-allowed">
+                    </div>
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kelas *</label>
+                        <input x-model="newMember.class" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm" placeholder="Contoh: X-IPA-1">
+                    </div>
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Upload Foto (Opsional)</label>
+                    <input type="file" @change="handleFileUpload($event, newMember, 'photo')" accept="image/*" class="w-full p-2.5 sm:p-3 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] sm:file:text-xs file:font-black file:bg-blue-50 file:text-blue-700">
+                </div>
+            </div>
+            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
+                <button type="button" @click="showAddMemberModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
+                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-emerald-600 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all text-sm">Simpan</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- MODAL: EDIT ANGGOTA (ADMIN) -->
+    <div x-show="showEditMemberModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+        <form @submit.prevent="updateMember" class="bg-white rounded-[24px] sm:rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 m-auto mt-16 sm:mt-auto">
+            <div class="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl sm:text-2xl font-black text-slate-800">Edit Anggota</h3>
+                <button type="button" @click="showEditMemberModal = false" class="p-2 sm:p-3 hover:bg-slate-100 rounded-lg sm:rounded-2xl text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 sm:p-8 space-y-4 sm:space-y-6">
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Nama Lengkap *</label>
+                    <input x-model="editingMember.name" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Nomor Induk (ID) *</label>
+                        <input x-model="editingMember.memberId" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Kelas *</label>
+                        <input x-model="editingMember.class" type="text" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Ganti Foto (Opsional)</label>
+                    <input type="file" @change="handleFileUpload($event, editingMember, 'photo')" accept="image/*" class="w-full p-2.5 sm:p-3 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] sm:file:text-xs file:font-black file:bg-blue-50 file:text-blue-700">
+                </div>
+            </div>
+            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
+                <button type="button" @click="showEditMemberModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
+                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-blue-600 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all text-sm">Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- MODAL: TAMBAH PEMINJAMAN (ADMIN) -->
+    <div x-show="showAddLoanModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-md overflow-y-auto">
+        <form @submit.prevent="addLoan" class="bg-white rounded-[24px] sm:rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 m-auto mt-16 sm:mt-auto">
+            <div class="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl sm:text-2xl font-black text-slate-800">Transaksi Baru</h3>
+                <button type="button" @click="showAddLoanModal = false" class="p-2 sm:p-3 hover:bg-slate-100 rounded-lg sm:rounded-2xl text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 sm:p-8 space-y-4 sm:space-y-6">
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Pilih Anggota *</label>
+                    <select x-model="newLoan.memberId" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                        <option value="">-- Pilih Peminjam --</option>
+                        <template x-for="m in members" :key="m.id">
+                            <option :value="m.id" x-text="m.memberId + ' - ' + m.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="space-y-1.5 sm:space-y-2">
+                    <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Pilih Buku *</label>
+                    <select x-model="newLoan.bookId" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                        <option value="">-- Pilih Buku Tersedia --</option>
+                        <template x-for="b in books" :key="b.id">
+                            <option x-show="b.stock > 0" :value="b.id" x-text="b.code + ' - ' + b.title + ' (Sisa: ' + b.stock + ')'"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Tgl Pinjam *</label>
+                        <input x-model="newLoan.borrowDate" type="date" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                    <div class="space-y-1.5 sm:space-y-2">
+                        <label class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Tgl Kembali *</label>
+                        <input x-model="newLoan.dueDate" type="date" required class="w-full p-3 sm:p-4 bg-slate-50 border-none rounded-xl sm:rounded-2xl font-bold text-sm">
+                    </div>
+                </div>
+            </div>
+            <div class="p-5 sm:p-8 bg-slate-50/50 flex space-x-3 sm:space-x-4">
+                <button type="button" @click="showAddLoanModal = false" class="flex-1 py-3 sm:py-4 font-black text-slate-400 hover:text-slate-600 text-sm">Batal</button>
+                <button type="submit" class="flex-[2] py-3 sm:py-4 bg-amber-500 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-amber-100 hover:bg-amber-600 transition-all text-sm">Konfirmasi</button>
+            </div>
+        </form>
+    </div>
+
+</body>
+</html>
