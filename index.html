@@ -96,17 +96,19 @@
                 editingMember: { id: null, name: '', memberId: '', class: '', address: '', photo: '' },
                 selectedMember: { name: '', photo: '', memberId: '', class: '' },
                 newLoan: { memberId: '', bookId: '', borrowDate: '', dueDate: '' },
-                reportConfig: { type: 'buku', startDate: '', endDate: '' },
+                reportConfig: { type: 'buku', startDate: '', endDate: '', visitFilter: 'semua' },
                 newJournal: { date: new Date().toISOString().split('T')[0], title: '', author: '', publisher: '', pages: '', summary: '' },
                 guestbookEntry: { date: new Date().toISOString().split('T')[0], name: '', institution: '', district: '', province: '', type: 'Umum' },
                 newCollection: { type: 'Fisik', jenis: '', judul: '', jumlahJudul: 1, jumlahEksemplar: 1 },
                 editingCollection: { id: null, type: 'Fisik', jenis: '', judul: '', jumlahJudul: 1, jumlahEksemplar: 1 },
+                aboutContent: JSON.parse(localStorage.getItem('perpusAbout')) || { title: 'Tentang Perpustakaan Kami', description: 'Selamat datang di Perpustakaan kami. Ini adalah pusat informasi digital yang didedikasikan untuk meningkatkan literasi dan pengetahuan anggota.' },
 
                 adminMenuItems: [
                     { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
                     { id: 'books', label: 'Data Buku', icon: 'book' },
                     { id: 'members', label: 'Data Anggota', icon: 'users' },
-                    { id: 'collections', label: 'Inventaris Koleksi', icon: 'layers' }
+                    { id: 'collections', label: 'Inventaris Koleksi', icon: 'layers' },
+                    { id: 'about_edit', label: 'Tentang Kami', icon: 'info' }
                 ],
 
                 // Firebase State References
@@ -122,6 +124,7 @@
                 members: [],
                 loans: [],
                 journals: [],
+                guests: [], // Untuk Buku Tamu
 
                 // Data Dummy Awal
                 mockBooks: [
@@ -142,6 +145,7 @@
                     // Default to Local Mode first
                     this.books = [...this.mockBooks];
                     this.collections = [...this.mockCollections];
+                    this.guests = JSON.parse(localStorage.getItem('perpusGuests')) || [];
 
                     // Cek Local Storage untuk Data Pengunjung Mode Lokal
                     const localStats = JSON.parse(localStorage.getItem('perpusStats')) || { visitorCount: 0, todayVisitorCount: 0, lastVisitDate: new Date().toISOString().split('T')[0] };
@@ -231,9 +235,14 @@
                         syncCollection('collections', 'collections');
                         syncCollection('loans', 'loans');
                         syncCollection('journals', 'journals');
+                        syncCollection('guests', 'guests');
 
                         window.fb.onSnapshot(this.getDoc('settings', 'global'), (doc) => {
                             if(doc.exists()) this.siteSettings = doc.data();
+                        }, e => console.error(e));
+
+                        window.fb.onSnapshot(this.getDoc('settings', 'about'), (doc) => {
+                            if(doc.exists()) this.aboutContent = doc.data();
                         }, e => console.error(e));
 
                         window.fb.onSnapshot(this.getDoc('stats', 'visitor'), (doc) => {
@@ -299,12 +308,21 @@
                     this.showToast('Pengaturan berhasil disimpan!');
                 },
 
+                saveAboutContent() {
+                    localStorage.setItem('perpusAbout', JSON.stringify(this.aboutContent));
+                    if (this.isCloudConnected) {
+                        window.fb.setDoc(this.getDoc('settings', 'about'), this.aboutContent);
+                    }
+                    this.showToast('Konten Tentang Kami berhasil diperbarui!');
+                },
+
                 submitGuestbook() {
                     if(!this.guestbookEntry.name || !this.guestbookEntry.institution || !this.guestbookEntry.district || !this.guestbookEntry.province) {
                         return this.showToast('Mohon lengkapi semua data buku tamu.', 'error');
                     }
                     
                     const todayStr = new Date().toISOString().split('T')[0];
+                    const guestObj = { id: Date.now().toString(), ...this.guestbookEntry, timestamp: Date.now() };
                     
                     // Tambah statistik pengunjung total
                     this.visitorCount++;
@@ -318,12 +336,15 @@
                     }
                     
                     if (this.isCloudConnected) {
+                        window.fb.setDoc(this.getDoc('guests', guestObj.id), guestObj);
                         window.fb.setDoc(this.getDoc('stats', 'visitor'), { 
                             visitorCount: this.visitorCount, 
                             todayVisitorCount: this.todayVisitorCount,
                             lastVisitDate: this.lastVisitDate
                         });
                     } else {
+                        this.guests.unshift(guestObj);
+                        localStorage.setItem('perpusGuests', JSON.stringify(this.guests));
                         localStorage.setItem('perpusStats', JSON.stringify({
                             visitorCount: this.visitorCount,
                             todayVisitorCount: this.todayVisitorCount,
@@ -790,6 +811,34 @@
                     return res;
                 },
 
+                get filteredGuestReports() {
+                    let res = this.guests;
+                    const today = new Date();
+                    const todayStr = today.toISOString().split('T')[0];
+
+                    if (this.reportConfig.visitFilter === 'harian') {
+                        res = res.filter(g => g.date === todayStr);
+                    } else if (this.reportConfig.visitFilter === 'mingguan') {
+                        const lastWeek = new Date(today);
+                        lastWeek.setDate(today.getDate() - 7);
+                        const lastWeekStr = lastWeek.toISOString().split('T')[0];
+                        res = res.filter(g => g.date >= lastWeekStr && g.date <= todayStr);
+                    } else if (this.reportConfig.visitFilter === 'bulanan') {
+                        const currentMonth = todayStr.substring(0, 7); // YYYY-MM
+                        res = res.filter(g => g.date.startsWith(currentMonth));
+                    } else if (this.reportConfig.visitFilter === 'tahunan') {
+                        const currentYear = todayStr.substring(0, 4); // YYYY
+                        res = res.filter(g => g.date.startsWith(currentYear));
+                    }
+
+                    // Tumpuk dengan filter manual jika diisi
+                    if (this.reportConfig.startDate) res = res.filter(g => g.date >= this.reportConfig.startDate);
+                    if (this.reportConfig.endDate) res = res.filter(g => g.date <= this.reportConfig.endDate);
+                    
+                    // Urutkan terbaru
+                    return res.sort((a,b) => b.timestamp - a.timestamp);
+                },
+
                 exportToExcel() {
                     let tables = document.querySelectorAll('#report-print-area table'); let visibleTable = null;
                     tables.forEach(t => { if (t.offsetParent !== null) visibleTable = t; });
@@ -894,6 +943,7 @@
                         <a href="#" @click.prevent="appState = 'collections'; collectionTypeView = 'Fisik'; showKoleksiDropdown = false" class="block px-5 py-3 text-sm font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors">Koleksi Fisik</a>
                     </div>
                 </div>
+                <a href="#" @click.prevent="appState = 'about'" class="text-sm font-bold transition-colors" :class="appState === 'about' ? 'text-blue-600 font-black' : 'text-slate-500 hover:text-slate-800'">Tentang Kami</a>
             </div>
 
             <div class="flex items-center space-x-2">
@@ -911,6 +961,7 @@
                 <a href="#" @click.prevent="appState = 'catalog'; mobileMenuOpen = false" class="text-base font-black text-slate-700 border-b border-slate-100 pb-2">Katalog Buku</a>
                 <a href="#" @click.prevent="appState = 'collections'; collectionTypeView = 'Digital'; mobileMenuOpen = false" class="text-base font-black text-blue-600 border-b border-slate-100 pb-2">Koleksi Digital</a>
                 <a href="#" @click.prevent="appState = 'collections'; collectionTypeView = 'Fisik'; mobileMenuOpen = false" class="text-base font-black text-blue-600 border-b border-slate-100 pb-2">Koleksi Fisik</a>
+                <a href="#" @click.prevent="appState = 'about'; mobileMenuOpen = false" class="text-base font-black text-slate-700 border-b border-slate-100 pb-2">Tentang Kami</a>
                 <div class="pt-2 flex space-x-3">
                     <button @click="goToLogin('member')" class="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-black shadow-lg shadow-blue-500/30">Masuk Anggota</button>
                     <button @click="goToLogin('admin')" class="flex-1 bg-slate-900 text-white py-3 rounded-xl text-sm font-black shadow-lg">Masuk Staf</button>
@@ -1108,6 +1159,22 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VIEW 0.7: PUBLIC ABOUT US TENTANG KAMI     -->
+    <!-- ========================================== -->
+    <div x-show="appState === 'about'" class="min-h-screen bg-slate-50 flex flex-col relative pt-20 pb-20">
+        <div class="max-w-4xl mx-auto px-4 md:px-6 w-full pt-10 md:pt-16">
+            <div class="bg-white p-8 md:p-12 rounded-[32px] md:rounded-[40px] shadow-sm border border-slate-100 animate-in fade-in zoom-in duration-500">
+                <div class="w-16 h-16 md:w-20 md:h-20 bg-blue-50 text-blue-600 rounded-2xl md:rounded-3xl flex items-center justify-center mb-6 shadow-inner mx-auto md:mx-0">
+                    <i data-lucide="info" class="w-8 h-8 md:w-10 md:h-10"></i>
+                </div>
+                <h2 class="text-3xl md:text-5xl font-black text-slate-800 mb-6 text-center md:text-left" x-text="aboutContent.title"></h2>
+                <div class="w-full h-px bg-slate-100 mb-6 md:mb-8"></div>
+                <div class="prose max-w-none text-slate-600 text-sm md:text-lg leading-relaxed font-medium whitespace-pre-wrap" x-text="aboutContent.description"></div>
             </div>
         </div>
     </div>
@@ -1799,13 +1866,25 @@
                                         <option value="anggota">Laporan Anggota</option>
                                         <option value="peminjaman">Laporan Peminjaman</option>
                                         <option value="pengembalian">Laporan Pengembalian</option>
+                                        <option value="kunjungan">Laporan Kunjungan</option>
                                     </select>
                                 </div>
-                                <div class="space-y-1 md:space-y-2">
+                                
+                                <div class="space-y-1 md:space-y-2" x-show="reportConfig.type === 'kunjungan'">
+                                    <label class="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Filter Kunjungan</label>
+                                    <select x-model="reportConfig.visitFilter" class="w-full p-2.5 md:p-3 bg-slate-50 border-none rounded-lg md:rounded-xl font-bold text-xs md:text-sm">
+                                        <option value="semua">Semua Waktu</option>
+                                        <option value="harian">Hari Ini</option>
+                                        <option value="mingguan">Minggu Ini</option>
+                                        <option value="bulanan">Bulan Ini</option>
+                                        <option value="tahunan">Tahun Ini</option>
+                                    </select>
+                                </div>
+                                <div class="space-y-1 md:space-y-2" x-show="reportConfig.type !== 'kunjungan'">
                                     <label class="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Mulai (Opsional)</label>
                                     <input x-model="reportConfig.startDate" type="date" class="w-full p-2.5 md:p-3 bg-slate-50 border-none rounded-lg md:rounded-xl font-bold text-xs md:text-sm">
                                 </div>
-                                <div class="space-y-1 md:space-y-2">
+                                <div class="space-y-1 md:space-y-2" x-show="reportConfig.type !== 'kunjungan'">
                                     <label class="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Sampai (Opsional)</label>
                                     <input x-model="reportConfig.endDate" type="date" class="w-full p-2.5 md:p-3 bg-slate-50 border-none rounded-lg md:rounded-xl font-bold text-xs md:text-sm">
                                 </div>
@@ -1900,8 +1979,58 @@
                                     </tbody>
                                 </table>
                             </div>
+
+                            <div x-show="reportConfig.type === 'kunjungan'">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-50 border-b-2 border-slate-200 text-slate-700 font-black text-xs md:text-sm">
+                                            <th class="p-2 md:p-3">Tanggal</th>
+                                            <th class="p-2 md:p-3">Nama Tamu</th>
+                                            <th class="p-2 md:p-3">Asal / Instansi</th>
+                                            <th class="p-2 md:p-3">Kab/Prov</th>
+                                            <th class="p-2 md:p-3">Ket</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="g in filteredGuestReports" :key="g.id">
+                                            <tr class="border-b border-slate-100">
+                                                <td class="p-2 md:p-3 text-[10px] md:text-xs font-bold" x-text="g.date"></td>
+                                                <td class="p-2 md:p-3 font-bold text-xs md:text-sm text-slate-800" x-text="g.name"></td>
+                                                <td class="p-2 md:p-3 text-[10px] md:text-xs font-bold text-slate-500" x-text="g.institution"></td>
+                                                <td class="p-2 md:p-3 text-[10px] md:text-xs font-bold text-slate-500" x-text="g.district + ', ' + g.province"></td>
+                                                <td class="p-2 md:p-3 text-[8px] md:text-[10px] font-black uppercase text-blue-500" x-text="g.type"></td>
+                                            </tr>
+                                        </template>
+                                        <tr x-show="filteredGuestReports.length === 0">
+                                            <td colspan="5" class="p-6 md:p-8 text-center text-slate-400 font-bold italic text-xs md:text-sm">Tidak ada data kunjungan.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- VIEW: TENTANG KAMI (ADMIN) -->
+                <div x-show="activeTab === 'about_edit' && staffRole === 'Admin'" x-cloak class="animate-in fade-in duration-500 max-w-3xl mx-auto w-full">
+                    <h3 class="text-2xl md:text-3xl font-black text-slate-800 tracking-tight mb-1 md:mb-2">Edit Tentang Kami</h3>
+                    <p class="text-xs md:text-sm text-slate-400 font-bold mb-6 md:mb-8">Kelola halaman informasi utama perpustakaan Anda.</p>
+
+                    <form @submit.prevent="saveAboutContent" class="bg-white p-6 md:p-10 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 space-y-4 md:space-y-6">
+                        <div class="space-y-1.5 md:space-y-2">
+                            <label class="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest">Judul Halaman</label>
+                            <input x-model="aboutContent.title" type="text" required class="w-full p-3 md:p-4 bg-slate-50 border-none rounded-xl md:rounded-2xl font-bold text-sm" placeholder="Contoh: Tentang Perpustakaan Kami">
+                        </div>
+                        <div class="space-y-1.5 md:space-y-2">
+                            <label class="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest">Isi Deskripsi / Sejarah</label>
+                            <textarea x-model="aboutContent.description" required class="w-full p-3 md:p-4 bg-slate-50 border-none rounded-xl md:rounded-2xl font-medium h-64 text-sm leading-relaxed" placeholder="Tulis profil perpustakaan di sini..."></textarea>
+                        </div>
+                        <div class="pt-4 md:pt-6 border-t border-slate-100">
+                            <button type="submit" class="w-full py-3 md:py-4 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black shadow-xl shadow-blue-500/30 hover:bg-blue-700 transition-all text-sm md:text-base">
+                                Simpan Konten
+                            </button>
+                        </div>
+                    </form>
                 </div>
 
                 <!-- VIEW: PENGATURAN WEB -->
