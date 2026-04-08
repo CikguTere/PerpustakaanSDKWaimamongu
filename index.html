@@ -358,6 +358,13 @@
 
                 doRegister() {
                     if(!this.newMember.name || !this.newMember.class) return;
+
+                    // Validasi: Cek apakah nama sudah pernah didaftarkan
+                    const isDuplicate = this.members.some(m => m.name.trim().toLowerCase() === this.newMember.name.trim().toLowerCase());
+                    if (isDuplicate) {
+                        return this.showToast('Pendaftaran Gagal! Nama ini sudah terdaftar sebagai anggota.', 'error');
+                    }
+
                     const newId = this.nextMemberId;
                     const id = Date.now().toString();
                     const photo = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(this.newMember.name) + '&background=0D8ABC&color=fff';
@@ -418,9 +425,17 @@
                 },
 
                 addMember() {
+                    if(!this.newMember.name) return;
+
+                    // Validasi: Cek apakah nama sudah ada (Khusus saat Admin tambah anggota manual)
+                    const isDuplicate = this.members.some(m => m.name.trim().toLowerCase() === this.newMember.name.trim().toLowerCase());
+                    if (isDuplicate) {
+                        return this.showToast('Gagal! Nama ini sudah ada di database anggota.', 'error');
+                    }
+
                     const newId = this.nextMemberId;
                     const id = Date.now().toString();
-                    const photo = this.newMember.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(this.newMember.name) + '&background=0D8ABC&color=fff';
+                    const photo = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(this.newMember.name) + '&background=0D8ABC&color=fff';
                     const memberObj = { ...this.newMember, id, memberId: newId, photo };
 
                     if (this.isCloudConnected) {
@@ -1793,8 +1808,8 @@
                     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
                         <template x-for="member in paginatedMembers" :key="member.id">
                             <div class="bg-white p-4 md:p-6 rounded-2xl md:rounded-[32px] border border-slate-100 text-center shadow-sm relative group">
-                                <button x-show="staffRole === 'Admin'" @click="deleteMember(member.id)" class="absolute top-2 right-2 md:top-4 md:right-4 p-1 md:p-1.5 text-slate-300 hover:bg-rose-50 hover:text-rose-500 rounded-md md:rounded-lg opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
-                                    <i data-lucide="x" class="w-4 h-4"></i>
+                                <button x-show="staffRole === 'Admin'" @click="deleteMember(member.id)" class="absolute top-2 right-2 md:top-3 md:right-3 p-1.5 md:p-2 bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white rounded-lg transition-all z-10 shadow-sm" title="Hapus Anggota">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5 md:w-4 md:h-4"></i>
                                 </button>
                                 <img :src="member.photo" class="w-16 h-16 md:w-20 md:h-20 rounded-full mx-auto mb-3 md:mb-4 object-cover ring-2 md:ring-4 ring-slate-50 bg-slate-100">
                                 <h4 class="font-black text-slate-800 line-clamp-1 text-sm md:text-base" x-text="member.name"></h4>
