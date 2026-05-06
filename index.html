@@ -9,7 +9,7 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <!-- HTML2PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
@@ -43,6 +43,15 @@
                     return date.getFullYear() + '-' + 
                            String(date.getMonth() + 1).padStart(2, '0') + '-' + 
                            String(date.getDate()).padStart(2, '0');
+                },
+
+                // Helper pembungkus aman untuk update ikon Lucide
+                updateIcons() {
+                    this.$nextTick(() => {
+                        if (typeof window !== 'undefined' && window.lucide) {
+                            window.lucide.createIcons();
+                        }
+                    });
                 },
 
                 // APP STATE
@@ -160,8 +169,8 @@
                 
                 async init() {
                     this.$watch('activeTab', () => { this.searchQuery = ''; });
-                    this.$watch('memberTab', () => { this.searchQuery = ''; this.$nextTick(() => lucide.createIcons()); });
-                    this.$nextTick(() => { lucide.createIcons(); });
+                    this.$watch('memberTab', () => { this.searchQuery = ''; this.updateIcons(); });
+                    this.updateIcons();
 
                     this.books = [...this.mockBooks];
                     this.collections = [...this.mockCollections];
@@ -222,7 +231,7 @@
                             } else if (this.seeded) {
                                 this[arrayName] = [];
                             }
-                            this.$nextTick(() => lucide.createIcons());
+                            this.updateIcons();
                         }, (e) => console.error("Sync Error:", e));
                     };
 
@@ -259,7 +268,7 @@
                     this.toast.type = type;
                     this.toast.show = true;
                     setTimeout(() => { this.toast.show = false; }, 3000);
-                    this.$nextTick(() => lucide.createIcons());
+                    this.updateIcons();
                 },
 
                 get nextMemberId() {
@@ -337,7 +346,7 @@
                     this.hasFilledGuestbook = true;
                     this.showGuestbookModal = false;
                     this.showToast('Buku Tamu Tersimpan! Silakan membaca.');
-                    this.$nextTick(() => lucide.createIcons());
+                    this.updateIcons();
                 },
 
                 doRegister() {
@@ -358,7 +367,7 @@
                     this.currentUser = { ...newMemberObj, role: 'member' };
                     this.memberTab = 'dashboard';
                     this.appState = 'member';
-                    this.$nextTick(() => lucide.createIcons());
+                    this.updateIcons();
                 },
 
                 addBook() {
@@ -371,7 +380,7 @@
                     this.showAddBookModal = false;
                     this.resetBookForm();
                     this.showToast('Buku berhasil ditambahkan!');
-                    this.$nextTick(() => lucide.createIcons());
+                    this.updateIcons();
                 },
                 
                 updateBook() {
@@ -407,7 +416,7 @@
                     this.showAddMemberModal = false;
                     this.resetMemberForm();
                     this.showToast('Anggota berhasil ditambahkan!');
-                    this.$nextTick(() => lucide.createIcons());
+                    this.updateIcons();
                 },
 
                 updateMember() {
@@ -518,7 +527,7 @@
                         this.showAddLoanModal = false;
                         this.newLoan = { memberId: '', bookId: '', borrowDate: '', dueDate: '' };
                         this.showToast('Transaksi berhasil direkam!');
-                        this.$nextTick(() => lucide.createIcons());
+                        this.updateIcons();
                     } else {
                         this.showToast('Gagal! Stok buku kosong.', 'error');
                     }
@@ -546,7 +555,7 @@
                         this.newLoan = { memberId: '', bookId: '', borrowDate: '', dueDate: '' };
                         this.showToast('Buku berhasil dipinjam!');
                         this.memberTab = 'loans';
-                        this.$nextTick(() => lucide.createIcons());
+                        this.updateIcons();
                     } else {
                         this.showToast('Gagal! Stok buku kosong.', 'error');
                     }
@@ -622,7 +631,7 @@
                 goToLogin(role) {
                     this.loginRole = role; this.appState = 'login';
                     this.loginUsername = ''; this.loginPassword = ''; this.loginId = '';
-                    this.mobileMenuOpen = false; this.$nextTick(() => lucide.createIcons());
+                    this.mobileMenuOpen = false; this.updateIcons();
                 },
                 
                 doLogin() {
@@ -631,12 +640,12 @@
                             this.currentUser = { name: 'Super Admin', role: 'staff' };
                             this.staffRole = 'Admin';
                             this.appState = 'admin';
-                            this.$nextTick(() => { lucide.createIcons(); this.renderChart(); });
+                            this.updateIcons(); this.$nextTick(() => this.renderChart());
                         } else if (this.loginUsername === 'petugas' && this.loginPassword === 'petugas123') {
                             this.currentUser = { name: 'Petugas Perpus', role: 'staff' };
                             this.staffRole = 'Petugas';
                             this.appState = 'admin';
-                            this.$nextTick(() => { lucide.createIcons(); this.renderChart(); });
+                            this.updateIcons(); this.$nextTick(() => this.renderChart());
                         } else {
                             this.showToast('Username atau Kata sandi salah!', 'error');
                         }
@@ -646,7 +655,7 @@
                             this.currentUser = { ...member, role: 'member' };
                             this.memberTab = 'dashboard';
                             this.appState = 'member';
-                            this.$nextTick(() => { lucide.createIcons(); });
+                            this.updateIcons();
                         } else {
                             this.showToast('Nomor Anggota tidak ditemukan!', 'error');
                         }
@@ -660,7 +669,7 @@
                     this.activeTab = 'dashboard';
                     this.memberTab = 'dashboard';
                     this.hasFilledGuestbook = false; 
-                    this.$nextTick(() => lucide.createIcons());
+                    this.updateIcons();
                 },
                 
                 openFlipbook(book) {
@@ -693,7 +702,7 @@
                     }
                     
                     this.showFlipbookModal = true;
-                    this.$nextTick(() => lucide.createIcons());
+                    this.updateIcons();
                 },
 
                 requestLoan(book) {
@@ -827,8 +836,8 @@
 
                 resetBookForm() { this.newBook = { title: '', author: '', code: '', category: 'Novel', stock: 1, cover: '', link: '', likes: 0 }; },
                 resetMemberForm() { this.newMember = { name: '', class: '', address: '', photo: '' }; },
-                prepareEditBook(book) { this.editingBook = { ...book }; this.showEditBookModal = true; this.$nextTick(() => lucide.createIcons()); },
-                prepareEditMember(member) { this.editingMember = { ...member }; this.showEditMemberModal = true; this.$nextTick(() => lucide.createIcons()); },
+                prepareEditBook(book) { this.editingBook = { ...book }; this.showEditBookModal = true; this.updateIcons(); },
+                prepareEditMember(member) { this.editingMember = { ...member }; this.showEditMemberModal = true; this.updateIcons(); },
                 prepareEditCollection(col) { this.editingCollection = { ...col }; this.showEditCollectionModal = true; },
                 
                 getCurrentLabel() {
@@ -836,7 +845,7 @@
                     const item = allItems.find(i => i.id === this.activeTab);
                     return item ? item.label : 'PerpusSmart';
                 },
-                showMemberCard(member) { this.selectedMember = member; this.cardModal = true; this.$nextTick(() => lucide.createIcons()); },
+                showMemberCard(member) { this.selectedMember = member; this.cardModal = true; this.updateIcons(); },
                 
                 renderChart() {
                     const ctx = document.getElementById('loanChart'); if (!ctx) return;
@@ -2089,42 +2098,6 @@
                 <button type="submit" class="flex-[2] py-3 sm:py-4 bg-blue-600 text-white rounded-xl sm:rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all text-sm">Simpan & Mulai Membaca</button>
             </div>
         </form>
-    </div>
-
-    <!-- MODAL: FLIPBOOK VIEWER -->
-    <div x-show="showFlipbookModal" x-cloak style="z-index: 99999;" class="fixed inset-0 bg-slate-900 flex flex-col animate-in fade-in duration-300">
-        <div class="p-3 md:p-4 flex justify-between items-center bg-slate-900 text-white border-b border-white/10 shadow-md">
-            <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                    <i data-lucide="book-open" class="w-4 h-4"></i>
-                </div>
-                <div>
-                    <h3 class="font-black text-sm md:text-base truncate max-w-[200px] md:max-w-md" x-text="currentReadBook?.title"></h3>
-                    <p class="text-[10px] text-slate-400 font-bold" x-text="currentReadBook?.author"></p>
-                </div>
-            </div>
-            <div class="flex items-center">
-                <a :href="currentReadBook?.link" target="_blank" class="p-2 bg-blue-500 hover:bg-blue-400 rounded-lg transition-colors flex items-center space-x-2 text-white mr-2" title="Buka di Tab Baru jika PDF tidak muncul">
-                    <i data-lucide="external-link" class="w-4 h-4"></i>
-                    <span class="text-xs font-bold hidden md:inline">Buka Eksternal</span>
-                </a>
-                <button @click="showFlipbookModal = false; if(currentSafeLink.startsWith('blob:')) URL.revokeObjectURL(currentSafeLink); currentSafeLink = ''; currentReadBook = null;" class="p-2 bg-white/10 hover:bg-rose-500 rounded-lg transition-colors flex items-center space-x-2">
-                    <span class="text-xs font-bold hidden md:inline">Tutup</span>
-                    <i data-lucide="x" class="w-4 h-4 md:w-5 md:h-5"></i>
-                </button>
-            </div>
-        </div>
-        <!-- Menampilkan PDF/Link secara Fullscreen -->
-        <div class="flex-1 w-full bg-[#323639] relative z-0">
-            <div class="absolute inset-0 flex flex-col items-center justify-center text-white/40 text-sm text-center p-6 -z-10">
-                <i data-lucide="shield-alert" class="w-12 h-12 mb-4 opacity-50"></i>
-                <p class="font-bold">Memuat dokumen PDF...</p>
-                <p class="text-[10px] mt-2 opacity-70">Jika layar tetap kosong, perangkat Anda mungkin memblokir tampilan PDF.<br>Silakan klik tombol <span class="text-blue-400">"Buka Eksternal"</span> di atas.</p>
-            </div>
-            <object x-show="currentSafeLink" :data="currentSafeLink" type="application/pdf" class="absolute inset-0 w-full h-full z-10 bg-white">
-                <iframe :src="currentSafeLink" class="w-full h-full border-0 bg-white" allowfullscreen></iframe>
-            </object>
-        </div>
     </div>
 
     <!-- MODAL: TAMBAH KOLEKSI (ADMIN) -->
